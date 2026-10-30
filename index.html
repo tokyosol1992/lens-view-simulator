@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lens View Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Pick a camera, a lens and a location and see the photograph it would make: framing, focus, bokeh, flare, distortion, diffraction and sensor noise, rendered live with WebGPU.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a camera back. Large viewfinder on the left, a lens-barrel focus scale under it,
+   the 100% loupe and spec readouts below; dials and choices in a right-hand column. */
+:root {
+  color-scheme: dark;
+  --bg: #101214;
+  --panel: #171a1d;
+  --panel-2: #1f2327;
+  --line: #2c3136;
+  --fg: #ebe8e2;
+  --muted: #9ba1a7;
+  --accent: #f0b43c;       /* depth-of-field amber, as engraved on lens barrels */
+  --accent-ink: #1b1404;
+  --stage: #0a0b0c;        /* neutral surround for judging pictures */
+  --stage-fg: #e9e6df;
+  --ok: #5fca8e;
+  --warn: #f0954f;
+  --bad: #ff6272;
+  --info: #7cb8ff;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #eae8e3; --panel: #f6f5f2; --panel-2: #efede8; --line: #d3d0c8;
+    --fg: #17191b; --muted: #5d6268; --accent: #a86e00; --accent-ink: #fff8ea;
+    --stage: #0d0e0f; --stage-fg: #ece9e2;
+    --ok: #1f8a52; --warn: #b5541a; --bad: #c22c3d; --info: #2565b5;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eae8e3; --panel: #f6f5f2; --panel-2: #efede8; --line: #d3d0c8;
+  --fg: #17191b; --muted: #5d6268; --accent: #a86e00; --accent-ink: #fff8ea;
+  --stage: #0d0e0f; --stage-fg: #ece9e2;
+  --ok: #1f8a52; --warn: #b5541a; --bad: #c22c3d; --info: #2565b5;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+  font-variation-settings: "wdth" 100;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px 28px;
+}
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px;
+  max-width: 1480px; margin: 0 auto 12px;
+}
+.brand {
+  font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.06em;
+  text-transform: uppercase; font-variation-settings: "wdth" 125; margin: 0;
+}
+.brand span { color: var(--accent); }
+.tagline { color: var(--muted); margin: 0; flex: 1 1 320px; min-width: 0; }
+.status { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+
+.app {
+  display: grid; gap: 16px; max-width: 1480px; margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
+}
+@media (max-width: 980px) { .app { grid-template-columns: minmax(0, 1fr); } }
+
+/* Viewfinder */
+.stage { display: grid; gap: 12px; min-width: 0; }
+.viewfinder {
+  position: relative; width: 100%; aspect-ratio: 3 / 2; background: var(--stage);
+  border-radius: var(--radius); overflow: hidden; cursor: crosshair; touch-action: manipulation;
+  max-width: 100%;
+}
+.viewfinder.comparing { touch-action: none; }
+.viewfinder canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.af {
+  position: absolute; width: var(--loupe, 40px); height: var(--loupe, 40px); transform: translate(-50%, -50%);
+  border: 1.5px solid var(--accent); border-radius: 2px; pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  min-width: 14px; min-height: 14px;
+}
+.af::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: var(--accent); border-radius: 50%; }
+.vf-info {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 18px; align-items: center;
+  padding: 7px 12px; background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+  font-family: var(--font-data); font-size: 13px; color: var(--stage-fg); pointer-events: none;
+  font-variant-numeric: tabular-nums; flex-wrap: wrap;
+}
+.vf-info .mode { background: var(--accent); color: #1b1404; padding: 0 5px; border-radius: 2px; font-weight: 600; }
+.vf-info .grow { flex: 1; }
+.progress { position: absolute; left: 0; top: 0; height: 2px; width: calc(var(--p, 0) * 100%); background: var(--accent); transition: opacity 0.4s; }
+.progress[data-done="true"] { opacity: 0; }
+.split { position: absolute; top: 0; bottom: 0; width: 0; pointer-events: none; }
+.split::before {
+  content: "⟷"; position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%);
+  width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); color: #111;
+  display: grid; place-items: center; font-size: 15px; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+.ab-labels { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; gap: 8px; }
+.ab-labels span {
+  font-family: var(--font-data); font-size: 11px; color: var(--stage-fg); background: rgba(0, 0, 0, 0.6);
+  padding: 3px 7px; border-radius: 3px; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gpu-error {
+  position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; gap: 6px;
+  color: var(--stage-fg);
+}
+.gpu-error strong { font-family: var(--font-display); font-variation-settings: "wdth" 112; font-size: 18px; }
+.gpu-error p { margin: 0; color: #b6b2aa; max-width: 52ch; }
+
+/* Focus scale + meter strip */
+.strip {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px;
+}
+@media (max-width: 640px) { .strip { grid-template-columns: minmax(0, 1fr); } }
+.strip-label { font-family: var(--font-display); font-variation-settings: "wdth" 112; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.strip-label b { font-family: var(--font-data); font-weight: 600; color: var(--fg); letter-spacing: 0; text-transform: none; font-size: 13px; }
+#focus-scale { width: 100%; height: 56px; display: block; cursor: ew-resize; touch-action: none; }
+.fs-axis { stroke: var(--line); stroke-width: 2; }
+.fs-tick { stroke: var(--muted); stroke-width: 1.5; }
+.fs-label { fill: var(--fg); font-family: var(--font-data); font-size: 11px; text-anchor: middle; }
+.fs-dof { fill: var(--accent); opacity: 0.28; }
+.fs-hyper { stroke: var(--info); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.fs-hyper-t { fill: var(--info); font-family: var(--font-data); font-size: 10px; text-anchor: middle; }
+.fs-pointer { fill: var(--accent); }
+.fs-pointer-line { stroke: var(--accent); stroke-width: 2; }
+#meter { width: 220px; height: 34px; display: block; }
+.m-major { stroke: var(--fg); stroke-width: 1.5; }
+.m-minor { stroke: var(--muted); stroke-width: 1; }
+.m-label { fill: var(--muted); font-family: var(--font-data); font-size: 10px; text-anchor: middle; }
+.m-bar { fill: var(--accent); }
+.m-pointer { fill: var(--accent); }
+
+/* Loupe + readouts */
+.below { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 760px) { .below { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
+.card h2 {
+  margin: 0 0 8px; font-family: var(--font-display); font-weight: 650; font-variation-settings: "wdth" 115;
+  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; text-wrap: balance;
+}
+.loupe-frame { position: relative; width: 100%; aspect-ratio: 1; background: var(--stage); border-radius: 4px; overflow: hidden; max-width: 100%; }
+.loupe-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.loupe-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.hint { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
+
+.readouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 18px; margin: 0; }
+.readouts div { min-width: 0; border-top: 1px solid var(--line); padding-top: 7px; }
+.readouts dt { font-family: var(--font-display); font-variation-settings: "wdth" 112; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.readouts dd { margin: 2px 0 0; font-family: var(--font-data); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.readouts dd small { display: block; font-family: var(--font-body); font-weight: 400; font-size: 12px; color: var(--muted); }
+.warnings { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.warnings li { padding: 6px 10px 6px 12px; border-radius: 4px; background: var(--panel-2); border-left: 3px solid var(--info); font-size: 13px; }
+.warnings .chip-warn { border-left-color: var(--warn); }
+.warnings .chip-bad { border-left-color: var(--bad); }
+
+/* Controls */
+.controls { display: grid; gap: 12px; min-width: 0; }
+.group { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.group > h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 650; font-variation-settings: "wdth" 115;
+  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+label.field { display: grid; gap: 4px; }
+.field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+.field-label output, .val { font-family: var(--font-data); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); }
+.is-auto .val::after { content: " auto"; color: var(--muted); font-weight: 400; font-size: 11px; }
+select {
+  width: 100%; padding: 7px 9px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
+}
+.note { color: var(--muted); font-size: 12.5px; margin: 0; }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0; }
+input[type="range"]:disabled { opacity: 0.45; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; background: var(--panel-2); padding: 6px 4px; cursor: pointer; font-size: 12.5px; border-left: 1px solid var(--line); }
+.seg button:first-child { border-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 650; }
+.chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--panel-2); border-radius: 4px; padding: 7px 8px; text-align: left; cursor: pointer; font-size: 12.5px; line-height: 1.25; }
+.chip[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.check { display: flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 4px; padding: 7px 10px; cursor: pointer; font-size: 13px; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
+.focus-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+@media (prefers-reduced-motion: reduce) { .progress { transition: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 class="brand">Lens View <span>Simulator</span></h1>
+  <p class="tagline">Choose a body, a lens and a location. The frame renders through the lens and onto the sensor you picked, so differences in focus, blur, flare, sharpness and noise show up as they would in the photo.</p>
+  <span class="status" id="status" role="status">Starting WebGPU…</span>
+</header>
+
+<main class="app">
+  <section class="stage" aria-label="Viewfinder and results">
+    <div class="viewfinder" id="viewfinder">
+      <canvas id="view" aria-label="Rendered photograph. Click to focus there."></canvas>
+      <div class="af" id="af-box" aria-hidden="true"></div>
+      <div class="split" id="split" hidden></div>
+      <div class="ab-labels" id="ab-labels" hidden><span>A · <span id="held-desc"></span></span><span>B · live</span></div>
+      <div class="progress" id="progress"></div>
+      <div class="vf-info" aria-live="off">
+        <span class="mode" id="vf-mode">A</span>
+        <span id="vf-shutter">1/250</span>
+        <span id="vf-aperture">F2.8</span>
+        <span id="vf-iso">ISO 100</span>
+        <span id="vf-ev">+0.0</span>
+        <span class="grow"></span>
+        <span id="vf-focal">50mm</span>
+      </div>
+      <div class="gpu-error" id="gpu-error" hidden>
+        <strong>WebGPU is not available here</strong>
+        <p id="gpu-error-detail"></p>
+        <p>Open this page in a current Chrome, Edge or Safari with WebGPU turned on. The readouts below still update.</p>
+      </div>
+    </div>
+
+    <div class="strip">
+      <div>
+        <div class="strip-label">Focus <b id="focus-val">2.40 m</b> <span id="focus-src">Subject</span> <span>· drag the scale or click the picture</span></div>
+        <svg id="focus-scale" role="slider" tabindex="0" aria-label="Focus distance" aria-valuetext="focus distance"></svg>
+      </div>
+      <div>
+        <div class="strip-label">Exposure</div>
+        <svg id="meter" aria-label="Exposure meter"></svg>
+      </div>
+    </div>
+
+    <div class="below">
+      <div class="card">
+        <h2>100% at AF point
+          <span class="seg" style="width: 132px">
+            <button type="button" data-zoom="1" id="zoom-1">1:1</button>
+            <button type="button" data-zoom="2" id="zoom-2">2:1</button>
+            <button type="button" data-zoom="4" id="zoom-4">4:1</button>
+          </span>
+        </h2>
+        <div class="loupe-frame"><canvas id="loupe" aria-label="Pixel-level crop at the focus point"></canvas></div>
+        <div class="loupe-foot">
+          <label class="check"><input type="checkbox" id="grid" checked> Pixel grid at 4:1</label>
+        </div>
+        <p class="hint">Rendered at this camera's own pixel pitch, through its colour filter and low-pass filter, with its noise.</p>
+      </div>
+      <div class="card">
+        <h2>What this combination gives you</h2>
+        <dl class="readouts">
+          <div><dt>Field of view</dt><dd id="ro-fov">–</dd><dd><small id="ro-fov-sub"></small></dd></div>
+          <div><dt>Full-frame equivalent</dt><dd id="ro-eq">–</dd><dd><small id="ro-eq-sub"></small></dd></div>
+          <div><dt>Depth of field</dt><dd id="ro-dof">–</dd><dd><small id="ro-dof-sub"></small></dd></div>
+          <div><dt>Background blur</dt><dd id="ro-bg">–</dd><dd><small id="ro-bg-sub"></small></dd></div>
+          <div><dt>Entrance pupil</dt><dd id="ro-pupil">–</dd><dd><small id="ro-pupil-sub"></small></dd></div>
+          <div><dt>Diffraction spot</dt><dd id="ro-airy">–</dd><dd><small id="ro-airy-sub"></small></dd></div>
+          <div><dt>Shake blur</dt><dd id="ro-shake">–</dd><dd><small id="ro-shake-sub"></small></dd></div>
+          <div><dt>Noise</dt><dd id="ro-noise">–</dd><dd><small id="ro-noise-sub"></small></dd></div>
+        </dl>
+        <ul class="warnings" id="warnings"></ul>
+      </div>
+    </div>
+  </section>
+
+  <aside class="controls" aria-label="Camera settings">
+    <section class="group">
+      <h2>Gear</h2>
+      <label class="field"><span class="field-label">Camera body</span><select id="camera"></select></label>
+      <p class="note" id="cam-spec"></p>
+      <label class="field"><span class="field-label">Lens</span><select id="lens"></select></label>
+      <p class="note" id="lens-note"></p>
+      <label class="field" id="focal-row"><span class="field-label">Focal length <output id="focal-val"></output></span><input type="range" id="focal" step="1"></label>
+    </section>
+
+    <section class="group">
+      <h2>Location</h2>
+      <div class="chips" id="scenes"></div>
+      <p class="note" id="scene-note"></p>
+      <label class="field"><span class="field-label">Distance to subject <output id="distance-val"></output></span><input type="range" id="distance" step="0.01"></label>
+      <label class="check"><input type="checkbox" id="keep" checked> Keep subject size when changing focal length</label>
+    </section>
+
+    <section class="group">
+      <h2>Exposure</h2>
+      <div class="seg" role="group" aria-label="Exposure mode">
+        <button type="button" data-mode="A" id="mode-a">Aperture priority</button>
+        <button type="button" data-mode="M" id="mode-m">Manual</button>
+        <button type="button" data-mode="MA" id="mode-ma">M + auto ISO</button>
+      </div>
+      <label class="field"><span class="field-label">Aperture <span class="val" id="aperture-val"></span></span><input type="range" id="aperture" min="0" step="1"></label>
+      <label class="field" id="shutter-row"><span class="field-label">Shutter <span class="val" id="shutter-val"></span></span><input type="range" id="shutter" min="0" step="1"></label>
+      <label class="field" id="iso-row"><span class="field-label">ISO <span class="val" id="iso-val"></span></span><input type="range" id="iso" min="0" step="1"></label>
+      <label class="field" id="ec-row"><span class="field-label">Exposure compensation <output id="ec-val"></output></span><input type="range" id="ec" min="-3" max="3" step="0.3333333"></label>
+      <div class="field"><span class="field-label">ND filter</span>
+        <div class="seg" role="group" aria-label="ND filter">
+          <button type="button" data-nd="0" id="nd-0">None</button>
+          <button type="button" data-nd="3" id="nd-3">ND8 · 3 stops</button>
+          <button type="button" data-nd="6" id="nd-6">ND64 · 6</button>
+          <button type="button" data-nd="10" id="nd-10">ND1000 · 10</button>
+        </div>
+      </div>
+      <div class="seg" role="group" aria-label="Support">
+        <button type="button" data-support="tripod" id="sup-tripod">Tripod</button>
+        <button type="button" data-support="stabilized" id="sup-is">Handheld + IS</button>
+        <button type="button" data-support="handheld" id="sup-hand">Handheld</button>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>Focus</h2>
+      <div class="focus-line"><span class="note">Click anywhere in the picture to focus there.</span><button type="button" class="btn" id="refocus">Focus on subject</button></div>
+    </section>
+
+    <section class="group">
+      <h2>Picture</h2>
+      <div class="row2">
+        <label class="field"><span class="field-label">White balance</span><select id="wb"></select></label>
+        <label class="field"><span class="field-label">Style</span><select id="style"></select></label>
+      </div>
+      <label class="check"><input type="checkbox" id="zebra"> Show clipped highlights</label>
+    </section>
+
+    <section class="group">
+      <h2>Compare</h2>
+      <p class="note">Hold the current picture as A, then change anything. Drag the divider on the picture to compare A with the live B.</p>
+      <div class="row2">
+        <button type="button" class="btn btn-primary" id="hold">Hold this view as A</button>
+        <button type="button" class="btn" id="clear-hold" hidden>Stop comparing</button>
+      </div>
+    </section>
+  </aside>
+</main>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
