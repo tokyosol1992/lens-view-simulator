@@ -236,6 +236,7 @@ function garden() {
   return {
     id: 'garden', name: 'Garden bench, golden hour', ev100: 12.5,
     blurb: 'Backlit teddy on a bench. String lights, leaf gaps and a low sun test bokeh, flare and sun stars.',
+    ko: { name: '정원 벤치, 골든아워', blurb: '벤치 위 역광 테디베어. 줄 조명, 나뭇잎 사이 빛, 낮은 해로 보케·플레어·빛갈라짐을 확인합니다.' },
     built: b.pack(), lights: b.lights, illuminant: [1.0, 0.93, 0.84],
     sun: { dir: norm([0.33, 0.13, 1.0]), color: [1.0, 0.68, 0.4], irradiance: 2.0, disc: 18000, size: 0.0047, shadow: true },
     sky: { zenith: [0.26, 0.38, 0.72], horizon: [1.5, 1.08, 0.72], ground: [0.12, 0.1, 0.06], ambient: 0.95, clouds: 0.25, stars: 0 },
@@ -365,6 +366,7 @@ function street() {
   return {
     id: 'street', name: 'City street at night', ev100: 4.5,
     blurb: 'Street lamps, neon and moving cars. Shows noise at high ISO, light trails and point-light bokeh.',
+    ko: { name: '밤의 도시 거리', blurb: '가로등, 네온, 지나가는 차. 고감도 노이즈, 빛 궤적, 점광원 보케를 확인합니다.' },
     built: b.pack(), lights: b.lights, illuminant: [1.0, 0.86, 0.68],
     sun: { dir: norm([-0.32, 0.4, 1.0]), color: [0.75, 0.82, 1.0], irradiance: 0.004, disc: 140, size: 0.0046, shadow: false },
     sky: { zenith: [0.003, 0.005, 0.012], horizon: [0.035, 0.025, 0.02], ground: [0.01, 0.01, 0.01], ambient: 0.6, clouds: 0, stars: 1 },
@@ -436,6 +438,7 @@ function lake() {
   return {
     id: 'lake', name: 'Mountain lake, afternoon', ev100: 14.5,
     blurb: 'Pier, lantern and a lake running to snowy peaks. Shows distortion, haze, hyperfocal depth and diffraction at f/16.',
+    ko: { name: '산정 호수, 오후', blurb: '부두와 랜턴, 눈 덮인 봉우리까지 이어지는 호수. 왜곡, 대기 원근, 과초점, f/16 회절을 확인합니다.' },
     built: b.pack(), lights: b.lights, illuminant: [1.0, 0.98, 0.95],
     sun: { dir: norm([-0.55, 0.5, 0.68]), color: [1.0, 0.94, 0.84], irradiance: 1.6, disc: 30000, size: 0.0047, shadow: true },
     sky: { zenith: [0.14, 0.3, 0.78], horizon: [0.85, 0.95, 1.1], ground: [0.1, 0.12, 0.1], ambient: 0.55, clouds: 0.55, stars: 0 },
@@ -500,6 +503,7 @@ function bench() {
   return {
     id: 'bench', name: 'Studio test bench', ev100: 9,
     blurb: 'Resolution star, zone plate, fine fabric, colour chart and a ruler running through focus.',
+    ko: { name: '스튜디오 테스트 벤치', blurb: '해상도 차트, 존 플레이트, 촘촘한 직물, 컬러 차트, 초점 범위를 가로지르는 자.' },
     built: b.pack(), lights: b.lights, illuminant: [1.0, 0.97, 0.93],
     sun: { dir: norm([-0.7, 0.75, -0.35]), color: [1.0, 0.98, 0.95], irradiance: 1.35, disc: 0, size: 0.0, shadow: true },
     sky: { zenith: [0.32, 0.32, 0.33], horizon: [0.25, 0.24, 0.23], ground: [0.1, 0.08, 0.06], ambient: 0.75, clouds: 0, stars: 0, indoor: 1 },
@@ -512,10 +516,10 @@ function bench() {
 
 const BUILDERS = { garden, street, lake, bench };
 export const SCENE_LIST = [
-  { id: 'garden', name: 'Garden bench, golden hour' },
-  { id: 'street', name: 'City street at night' },
-  { id: 'lake', name: 'Mountain lake, afternoon' },
-  { id: 'bench', name: 'Studio test bench' },
+  { id: 'garden', name: 'Garden bench, golden hour', ko: { name: '정원 벤치, 골든아워' } },
+  { id: 'street', name: 'City street at night', ko: { name: '밤의 도시 거리' } },
+  { id: 'lake', name: 'Mountain lake, afternoon', ko: { name: '산정 호수, 오후' } },
+  { id: 'bench', name: 'Studio test bench', ko: { name: '스튜디오 테스트 벤치' } },
 ];
 const cache = new Map();
 export function getScene(id) {

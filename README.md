@@ -2,6 +2,8 @@
 
 A web page for camera and lens customers. Pick a camera body, a lens and a sample location, and the page renders the photograph that combination would produce, live, with WebGPU. Change any setting and the frame re-renders, so the differences between products show up in the picture itself. You can also hold one result as **A** and drag a divider to compare it with the live **B**.
 
+The interface is available in English and Korean. The **EN / 한국어** switch sits in the top bar on phones and desktops. It defaults to the browser language, remembers the choice in the browser, and can be set with `?lang=ko` or `?lang=en`. Switching language changes only the text, so the picture is not re-rendered.
+
 The page is static: no build step and no dependencies.
 
 ```sh
@@ -59,18 +61,20 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `src/optics.js` | Camera maths: FOV, DOF, hyperfocal, exposure, diffraction, noise, shake |
 | `src/scenes.js` | The four locations |
 | `src/main.js` | UI state, per-view camera parameters, readouts, focus scale, A/B |
+| `src/i18n.js` | English and Korean interface text, language detection and switching |
 | `src/gpu/renderer.js` | WebGPU resources and pass orchestration |
 | `src/gpu/shaders-*.js` | WGSL |
 | `tools/check-optics.mjs` | `node tools/check-optics.mjs`: optics maths against textbook values |
 | `tools/check-wgsl.mjs` | Compiles every shader in headless Chromium and lists errors |
+| `tools/i18n-check.mjs` | Checks the language switch on desktop and phone widths: every label translated, no overflow, choice persists |
 | `tools/interact.mjs` | Clicks to focus, holds A, refocuses and switches lens in headless Chromium |
 | `tools/shoot.mjs` | Renders setups headlessly and saves screenshots, e.g. `node tools/shoot.mjs out "scene=street&lens=p85&q=draft"` |
 
-A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `zoom` (loupe 1, 2 or 4), `wb`, `style` and `q` (`draft`, `standard`, `high`).
+A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `zoom` (loupe 1, 2 or 4), `wb`, `style`, `lang` (`en`, `ko`) and `q` (`draft`, `standard`, `high`).
 
 ## Adding products
 
-Add an entry to `CAMERAS` or `LENSES` in `src/catalog.js`; the comments there describe each field. The current entries describe product *classes* (for example "Full frame 24 MP" or "85mm f/1.4 portrait") with representative values. They are not measurements of specific commercial models. For a real catalogue, fill in the manufacturer's sensor size, pixel count, base ISO and blade count. Optical character values (distortion, CA, softness, flare) are best taken from lab measurements.
+Add an entry to `CAMERAS` or `LENSES` in `src/catalog.js`; the comments there describe each field. Give it a `ko: { name, note }` field for the Korean interface; without one, the English text is shown. The current entries describe product *classes* (for example "Full frame 24 MP" or "85mm f/1.4 portrait") with representative values. They are not measurements of specific commercial models. For a real catalogue, fill in the manufacturer's sensor size, pixel count, base ISO and blade count. Optical character values (distortion, CA, softness, flare) are best taken from lab measurements.
 
 ## Limits
 

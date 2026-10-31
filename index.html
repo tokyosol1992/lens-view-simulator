@@ -8,7 +8,7 @@
 <meta name="description" content="Pick a camera, a lens and a location and see the photograph it would make: framing, focus, bokeh, flare, distortion, diffraction and sensor noise, rendered live with WebGPU.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 /* Layout: a camera back. Large viewfinder on the left, a lens-barrel focus scale under it,
    the 100% loupe and spec readouts below; dials and choices in a right-hand column. */
@@ -28,8 +28,9 @@
   --warn: #f0954f;
   --bad: #ff6272;
   --info: #7cb8ff;
-  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --font-body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Archivo", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-body: "Archivo", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --auto-label: " auto";
   --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --radius: 6px;
 }
@@ -64,16 +65,18 @@ body {
 button, select, input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.top {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px;
-  max-width: 1480px; margin: 0 auto 12px;
-}
+.top { display: grid; gap: 6px; max-width: 1480px; margin: 0 auto 12px; }
+.top-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.top-row .status { margin-left: auto; }
+.lang { grid-auto-columns: minmax(52px, auto); }
+.lang button { min-height: 34px; padding: 6px 12px; font-size: 13px; }
+.zoom { width: 132px; flex: none; }
 .brand {
   font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.06em;
   text-transform: uppercase; font-variation-settings: "wdth" 125; margin: 0;
 }
-.brand span { color: var(--accent); }
-.tagline { color: var(--muted); margin: 0; flex: 1 1 320px; min-width: 0; }
+.brand .accent { color: var(--accent); }
+.tagline { color: var(--muted); margin: 0; max-width: 90ch; }
 .status { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
 
 .app {
@@ -185,7 +188,7 @@ button, select, input { font: inherit; color: inherit; }
 label.field { display: grid; gap: 4px; }
 .field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
 .field-label output, .val { font-family: var(--font-data); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); }
-.is-auto .val::after { content: " auto"; color: var(--muted); font-weight: 400; font-size: 11px; }
+.is-auto .val::after { content: var(--auto-label); color: var(--muted); font-weight: 400; font-size: 11px; }
 select {
   width: 100%; padding: 7px 9px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
 }
@@ -206,22 +209,34 @@ input[type="range"]:disabled { opacity: 0.45; }
 .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
 .focus-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
 @media (prefers-reduced-motion: reduce) { .progress { transition: none; } }
+/* Korean: keep words whole and relax the tracking used for Latin capitals */
+:root[lang="ko"] { --auto-label: " 자동"; }
+:root[lang="ko"] body { word-break: keep-all; overflow-wrap: break-word; }
+:root[lang="ko"] .brand, :root[lang="ko"] .group > h2, :root[lang="ko"] .card h2,
+:root[lang="ko"] .strip-label, :root[lang="ko"] .readouts dt { letter-spacing: 0.02em; }
+:root[lang="ko"] .group > h2, :root[lang="ko"] .card h2, :root[lang="ko"] .readouts dt { font-size: 12.5px; }
 </style>
 </head>
 <body>
 <header class="top">
-  <h1 class="brand">Lens View <span>Simulator</span></h1>
-  <p class="tagline">Choose a body, a lens and a location. The frame renders through the lens and onto the sensor you picked, so differences in focus, blur, flare, sharpness and noise show up as they would in the photo.</p>
-  <span class="status" id="status" role="status">Starting WebGPU…</span>
+  <div class="top-row">
+    <h1 class="brand"><span data-i18n="brand.a">Lens View</span> <span class="accent" data-i18n="brand.b">Simulator</span></h1>
+    <span class="status" id="status" role="status" data-i18n="status.starting">Starting WebGPU…</span>
+    <div class="seg lang" role="group" aria-label="Language" data-i18n-aria="aria.lang">
+      <button type="button" data-lang="en" id="lang-en" lang="en">EN</button>
+      <button type="button" data-lang="ko" id="lang-ko" lang="ko">한국어</button>
+    </div>
+  </div>
+  <p class="tagline" data-i18n="tagline">Choose a body, a lens and a location. The frame renders through the lens and onto the sensor you picked, so differences in focus, blur, flare, sharpness and noise show up as they would in the photo.</p>
 </header>
 
 <main class="app">
-  <section class="stage" aria-label="Viewfinder and results">
+  <section class="stage" aria-label="Viewfinder and results" data-i18n-aria="aria.stage">
     <div class="viewfinder" id="viewfinder">
-      <canvas id="view" aria-label="Rendered photograph. Click to focus there."></canvas>
+      <canvas id="view" aria-label="Rendered photograph. Click to focus there." data-i18n-aria="aria.view"></canvas>
       <div class="af" id="af-box" aria-hidden="true"></div>
       <div class="split" id="split" hidden></div>
-      <div class="ab-labels" id="ab-labels" hidden><span>A · <span id="held-desc"></span></span><span>B · live</span></div>
+      <div class="ab-labels" id="ab-labels" hidden><span>A · <span id="held-desc"></span></span><span data-i18n="ab.live">B · live</span></div>
       <div class="progress" id="progress"></div>
       <div class="vf-info" aria-live="off">
         <span class="mode" id="vf-mode">A</span>
@@ -233,119 +248,119 @@ input[type="range"]:disabled { opacity: 0.45; }
         <span id="vf-focal">50mm</span>
       </div>
       <div class="gpu-error" id="gpu-error" hidden>
-        <strong>WebGPU is not available here</strong>
+        <strong data-i18n="gpu.title">WebGPU is not available here</strong>
         <p id="gpu-error-detail"></p>
-        <p>Open this page in a current Chrome, Edge or Safari with WebGPU turned on. The readouts below still update.</p>
+        <p data-i18n="gpu.help">Open this page in a current Chrome, Edge or Safari with WebGPU turned on. The readouts below still update.</p>
       </div>
     </div>
 
     <div class="strip">
       <div>
-        <div class="strip-label">Focus <b id="focus-val">2.40 m</b> <span id="focus-src">Subject</span> <span>· drag the scale or click the picture</span></div>
-        <svg id="focus-scale" role="slider" tabindex="0" aria-label="Focus distance" aria-valuetext="focus distance"></svg>
+        <div class="strip-label"><span data-i18n="strip.focus">Focus</span> <b id="focus-val">2.40 m</b> <span id="focus-src">Subject</span> <span data-i18n="strip.hint">· drag the scale or click the picture</span></div>
+        <svg id="focus-scale" role="slider" tabindex="0" aria-label="Focus distance" data-i18n-aria="aria.focusScale" aria-valuetext="focus distance"></svg>
       </div>
       <div>
-        <div class="strip-label">Exposure</div>
-        <svg id="meter" aria-label="Exposure meter"></svg>
+        <div class="strip-label" data-i18n="strip.exposure">Exposure</div>
+        <svg id="meter" aria-label="Exposure meter" data-i18n-aria="aria.meter"></svg>
       </div>
     </div>
 
     <div class="below">
       <div class="card">
-        <h2>100% at AF point
-          <span class="seg" style="width: 132px">
+        <h2><span data-i18n="loupe.title">100% at AF point</span>
+          <span class="seg zoom" role="group" aria-label="Loupe magnification" data-i18n-aria="aria.zoom">
             <button type="button" data-zoom="1" id="zoom-1">1:1</button>
             <button type="button" data-zoom="2" id="zoom-2">2:1</button>
             <button type="button" data-zoom="4" id="zoom-4">4:1</button>
           </span>
         </h2>
-        <div class="loupe-frame"><canvas id="loupe" aria-label="Pixel-level crop at the focus point"></canvas></div>
+        <div class="loupe-frame"><canvas id="loupe" aria-label="Pixel-level crop at the focus point" data-i18n-aria="aria.loupe"></canvas></div>
         <div class="loupe-foot">
-          <label class="check"><input type="checkbox" id="grid" checked> Pixel grid at 4:1</label>
+          <label class="check"><input type="checkbox" id="grid" checked> <span data-i18n="loupe.grid">Pixel grid at 4:1</span></label>
         </div>
-        <p class="hint">Rendered at this camera's own pixel pitch, through its colour filter and low-pass filter, with its noise.</p>
+        <p class="hint" data-i18n="loupe.hint">Rendered at this camera's own pixel pitch, through its colour filter and low-pass filter, with its noise.</p>
       </div>
       <div class="card">
-        <h2>What this combination gives you</h2>
+        <h2 data-i18n="results.title">What this combination gives you</h2>
         <dl class="readouts">
-          <div><dt>Field of view</dt><dd id="ro-fov">–</dd><dd><small id="ro-fov-sub"></small></dd></div>
-          <div><dt>Full-frame equivalent</dt><dd id="ro-eq">–</dd><dd><small id="ro-eq-sub"></small></dd></div>
-          <div><dt>Depth of field</dt><dd id="ro-dof">–</dd><dd><small id="ro-dof-sub"></small></dd></div>
-          <div><dt>Background blur</dt><dd id="ro-bg">–</dd><dd><small id="ro-bg-sub"></small></dd></div>
-          <div><dt>Entrance pupil</dt><dd id="ro-pupil">–</dd><dd><small id="ro-pupil-sub"></small></dd></div>
-          <div><dt>Diffraction spot</dt><dd id="ro-airy">–</dd><dd><small id="ro-airy-sub"></small></dd></div>
-          <div><dt>Shake blur</dt><dd id="ro-shake">–</dd><dd><small id="ro-shake-sub"></small></dd></div>
-          <div><dt>Noise</dt><dd id="ro-noise">–</dd><dd><small id="ro-noise-sub"></small></dd></div>
+          <div><dt data-i18n="ro.fov">Field of view</dt><dd id="ro-fov">–</dd><dd><small id="ro-fov-sub"></small></dd></div>
+          <div><dt data-i18n="ro.eq">Full-frame equivalent</dt><dd id="ro-eq">–</dd><dd><small id="ro-eq-sub"></small></dd></div>
+          <div><dt data-i18n="ro.dof">Depth of field</dt><dd id="ro-dof">–</dd><dd><small id="ro-dof-sub"></small></dd></div>
+          <div><dt data-i18n="ro.bg">Background blur</dt><dd id="ro-bg">–</dd><dd><small id="ro-bg-sub"></small></dd></div>
+          <div><dt data-i18n="ro.pupil">Entrance pupil</dt><dd id="ro-pupil">–</dd><dd><small id="ro-pupil-sub"></small></dd></div>
+          <div><dt data-i18n="ro.airy">Diffraction spot</dt><dd id="ro-airy">–</dd><dd><small id="ro-airy-sub"></small></dd></div>
+          <div><dt data-i18n="ro.shake">Shake blur</dt><dd id="ro-shake">–</dd><dd><small id="ro-shake-sub"></small></dd></div>
+          <div><dt data-i18n="ro.noise">Noise</dt><dd id="ro-noise">–</dd><dd><small id="ro-noise-sub"></small></dd></div>
         </dl>
         <ul class="warnings" id="warnings"></ul>
       </div>
     </div>
   </section>
 
-  <aside class="controls" aria-label="Camera settings">
+  <aside class="controls" aria-label="Camera settings" data-i18n-aria="aria.controls">
     <section class="group">
-      <h2>Gear</h2>
-      <label class="field"><span class="field-label">Camera body</span><select id="camera"></select></label>
+      <h2 data-i18n="group.gear">Gear</h2>
+      <label class="field"><span class="field-label" data-i18n="field.camera">Camera body</span><select id="camera"></select></label>
       <p class="note" id="cam-spec"></p>
-      <label class="field"><span class="field-label">Lens</span><select id="lens"></select></label>
+      <label class="field"><span class="field-label" data-i18n="field.lens">Lens</span><select id="lens"></select></label>
       <p class="note" id="lens-note"></p>
-      <label class="field" id="focal-row"><span class="field-label">Focal length <output id="focal-val"></output></span><input type="range" id="focal" step="1"></label>
+      <label class="field" id="focal-row"><span class="field-label"><span data-i18n="field.focal">Focal length</span> <output id="focal-val"></output></span><input type="range" id="focal" step="1"></label>
     </section>
 
     <section class="group">
-      <h2>Location</h2>
+      <h2 data-i18n="group.location">Location</h2>
       <div class="chips" id="scenes"></div>
       <p class="note" id="scene-note"></p>
-      <label class="field"><span class="field-label">Distance to subject <output id="distance-val"></output></span><input type="range" id="distance" step="0.01"></label>
-      <label class="check"><input type="checkbox" id="keep" checked> Keep subject size when changing focal length</label>
+      <label class="field"><span class="field-label"><span data-i18n="field.distance">Distance to subject</span> <output id="distance-val"></output></span><input type="range" id="distance" step="0.01"></label>
+      <label class="check"><input type="checkbox" id="keep" checked> <span data-i18n="field.keep">Keep subject size when changing focal length</span></label>
     </section>
 
     <section class="group">
-      <h2>Exposure</h2>
-      <div class="seg" role="group" aria-label="Exposure mode">
-        <button type="button" data-mode="A" id="mode-a">Aperture priority</button>
-        <button type="button" data-mode="M" id="mode-m">Manual</button>
-        <button type="button" data-mode="MA" id="mode-ma">M + auto ISO</button>
+      <h2 data-i18n="group.exposure">Exposure</h2>
+      <div class="seg" role="group" aria-label="Exposure mode" data-i18n-aria="aria.mode">
+        <button type="button" data-mode="A" id="mode-a" data-i18n="mode.A">Aperture priority</button>
+        <button type="button" data-mode="M" id="mode-m" data-i18n="mode.M">Manual</button>
+        <button type="button" data-mode="MA" id="mode-ma" data-i18n="mode.MA">M + auto ISO</button>
       </div>
-      <label class="field"><span class="field-label">Aperture <span class="val" id="aperture-val"></span></span><input type="range" id="aperture" min="0" step="1"></label>
-      <label class="field" id="shutter-row"><span class="field-label">Shutter <span class="val" id="shutter-val"></span></span><input type="range" id="shutter" min="0" step="1"></label>
-      <label class="field" id="iso-row"><span class="field-label">ISO <span class="val" id="iso-val"></span></span><input type="range" id="iso" min="0" step="1"></label>
-      <label class="field" id="ec-row"><span class="field-label">Exposure compensation <output id="ec-val"></output></span><input type="range" id="ec" min="-3" max="3" step="0.3333333"></label>
-      <div class="field"><span class="field-label">ND filter</span>
-        <div class="seg" role="group" aria-label="ND filter">
-          <button type="button" data-nd="0" id="nd-0">None</button>
-          <button type="button" data-nd="3" id="nd-3">ND8 · 3 stops</button>
-          <button type="button" data-nd="6" id="nd-6">ND64 · 6</button>
-          <button type="button" data-nd="10" id="nd-10">ND1000 · 10</button>
+      <label class="field"><span class="field-label"><span data-i18n="field.aperture">Aperture</span> <span class="val" id="aperture-val"></span></span><input type="range" id="aperture" min="0" step="1"></label>
+      <label class="field" id="shutter-row"><span class="field-label"><span data-i18n="field.shutter">Shutter</span> <span class="val" id="shutter-val"></span></span><input type="range" id="shutter" min="0" step="1"></label>
+      <label class="field" id="iso-row"><span class="field-label"><span data-i18n="field.iso">ISO</span> <span class="val" id="iso-val"></span></span><input type="range" id="iso" min="0" step="1"></label>
+      <label class="field" id="ec-row"><span class="field-label"><span data-i18n="field.ec">Exposure compensation</span> <output id="ec-val"></output></span><input type="range" id="ec" min="-3" max="3" step="0.3333333"></label>
+      <div class="field"><span class="field-label" data-i18n="field.nd">ND filter</span>
+        <div class="seg" role="group" aria-label="ND filter" data-i18n-aria="aria.nd">
+          <button type="button" data-nd="0" id="nd-0" data-i18n="nd.0">None</button>
+          <button type="button" data-nd="3" id="nd-3" data-i18n="nd.3">ND8 · 3 stops</button>
+          <button type="button" data-nd="6" id="nd-6" data-i18n="nd.6">ND64 · 6</button>
+          <button type="button" data-nd="10" id="nd-10" data-i18n="nd.10">ND1000 · 10</button>
         </div>
       </div>
-      <div class="seg" role="group" aria-label="Support">
-        <button type="button" data-support="tripod" id="sup-tripod">Tripod</button>
-        <button type="button" data-support="stabilized" id="sup-is">Handheld + IS</button>
-        <button type="button" data-support="handheld" id="sup-hand">Handheld</button>
+      <div class="seg" role="group" aria-label="Support" data-i18n-aria="aria.support">
+        <button type="button" data-support="tripod" id="sup-tripod" data-i18n="support.tripod">Tripod</button>
+        <button type="button" data-support="stabilized" id="sup-is" data-i18n="support.stabilized">Handheld + IS</button>
+        <button type="button" data-support="handheld" id="sup-hand" data-i18n="support.handheld">Handheld</button>
       </div>
     </section>
 
     <section class="group">
-      <h2>Focus</h2>
-      <div class="focus-line"><span class="note">Click anywhere in the picture to focus there.</span><button type="button" class="btn" id="refocus">Focus on subject</button></div>
+      <h2 data-i18n="group.focus">Focus</h2>
+      <div class="focus-line"><span class="note" data-i18n="focus.note">Click anywhere in the picture to focus there.</span><button type="button" class="btn" id="refocus" data-i18n="focus.refocus">Focus on subject</button></div>
     </section>
 
     <section class="group">
-      <h2>Picture</h2>
+      <h2 data-i18n="group.picture">Picture</h2>
       <div class="row2">
-        <label class="field"><span class="field-label">White balance</span><select id="wb"></select></label>
-        <label class="field"><span class="field-label">Style</span><select id="style"></select></label>
+        <label class="field"><span class="field-label" data-i18n="field.wb">White balance</span><select id="wb"></select></label>
+        <label class="field"><span class="field-label" data-i18n="field.style">Style</span><select id="style"></select></label>
       </div>
-      <label class="check"><input type="checkbox" id="zebra"> Show clipped highlights</label>
+      <label class="check"><input type="checkbox" id="zebra"> <span data-i18n="field.zebra">Show clipped highlights</span></label>
     </section>
 
     <section class="group">
-      <h2>Compare</h2>
-      <p class="note">Hold the current picture as A, then change anything. Drag the divider on the picture to compare A with the live B.</p>
+      <h2 data-i18n="group.compare">Compare</h2>
+      <p class="note" data-i18n="compare.note">Hold the current picture as A, then change anything. Drag the divider on the picture to compare A with the live B.</p>
       <div class="row2">
         <button type="button" class="btn btn-primary" id="hold">Hold this view as A</button>
-        <button type="button" class="btn" id="clear-hold" hidden>Stop comparing</button>
+        <button type="button" class="btn" id="clear-hold" hidden data-i18n="compare.stop">Stop comparing</button>
       </div>
     </section>
   </aside>

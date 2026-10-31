@@ -2,6 +2,7 @@ import { CAMERAS, LENSES, APERTURES, SHUTTERS, ISOS, WHITE_BALANCE, STYLES } fro
 import * as O from './optics.js';
 import { getScene, SCENE_LIST } from './scenes.js';
 import { Renderer, cameraBasis } from './gpu/renderer.js';
+import { t, loc, getLang, setLang, applyStatic } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -46,6 +47,7 @@ const state = {
 let renderer = null;
 let shot = null;
 let lastFEq = null;
+let lastUI = null;
 
 const norm3 = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); };
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -70,16 +72,21 @@ function fmtDist(m) {
 }
 const fmtEV = (e) => (e >= 0 ? '+' : '−') + Math.abs(e).toFixed(1);
 
-// --- Populate controls -------------------------------------------------------------------
+// --- Populate controls (re-run when the language changes) ---------------------------------
 function fillSelect(el, items, value) {
-  el.innerHTML = items.map((it) => `<option value="${it.id}">${it.name}</option>`).join('');
+  el.innerHTML = items.map((it) => `<option value="${it.id}">${loc(it)}</option>`).join('');
   el.value = value;
 }
-fillSelect($('camera'), CAMERAS, state.cameraId);
-fillSelect($('lens'), LENSES, state.lensId);
-fillSelect($('wb'), WHITE_BALANCE, state.wb);
-fillSelect($('style'), STYLES, state.style);
-$('scenes').innerHTML = SCENE_LIST.map((s) => `<button type="button" class="chip" data-scene="${s.id}" id="scene-${s.id}">${s.name}</button>`).join('');
+function renderLabels() {
+  applyStatic();
+  fillSelect($('camera'), CAMERAS, state.cameraId);
+  fillSelect($('lens'), LENSES, state.lensId);
+  fillSelect($('wb'), WHITE_BALANCE, state.wb);
+  fillSelect($('style'), STYLES, state.style);
+  $('scenes').innerHTML = SCENE_LIST.map((s) => `<button type="button" class="chip" data-scene="${s.id}" id="scene-${s.id}">${loc(s)}</button>`).join('');
+  $('hold').textContent = t(state.comparing ? 'compare.replace' : 'compare.hold');
+}
+renderLabels();
 
 // --- Scene camera ------------------------------------------------------------------------------
 function aimBasis(eye, subject, frameTan) {
@@ -185,6 +192,7 @@ function update() {
   };
   updateViews();
   if (renderer) renderer.setShot(shot);
+  lastUI = [cam, ln, sc, res];
   renderUI(cam, ln, sc, res);
 }
 
@@ -285,9 +293,12 @@ function renderUI(cam, ln, sc, r) {
   document.querySelectorAll('[data-support]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.support === state.support)));
   document.querySelectorAll('[data-nd]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.nd === state.nd)));
   document.querySelectorAll('[data-zoom]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.zoom === state.loupeZoom)));
-  $('lens-note').textContent = ln.note;
-  $('scene-note').textContent = sc.blurb;
-  $('cam-spec').textContent = `${cam.sensor[0]} × ${cam.sensor[1]} mm · ${O.megapixels(cam).toFixed(0)} MP · ${(O.pixelPitchMM(cam) * 1000).toFixed(2)} µm pixels · ${cam.aa ? 'low-pass filter' : 'no low-pass filter'}`;
+  $('lens-note').textContent = loc(ln, 'note');
+  $('scene-note').textContent = loc(sc, 'blurb');
+  $('cam-spec').textContent = t('cam.spec', {
+    w: cam.sensor[0], h: cam.sensor[1], mp: O.megapixels(cam).toFixed(0),
+    p: (O.pixelPitchMM(cam) * 1000).toFixed(2), aa: t(cam.aa ? 'cam.aa' : 'cam.noAa'),
+  });
 
   // Focal length
   const zoomRow = $('focal-row');
@@ -315,7 +326,7 @@ function renderUI(cam, ln, sc, r) {
   $('distance-val').textContent = fmtDist(state.distance);
   $('keep').checked = state.keepFraming;
   $('focus-val').textContent = fmtDist(r.focusM);
-  $('focus-src').textContent = state.afTracksSubject ? 'Subject' : 'Manual';
+  $('focus-src').textContent = t(state.afTracksSubject ? 'focus.subject' : 'focus.manual');
 
   // Picture
   $('wb').value = state.wb; $('style').value = state.style; $('zebra').checked = state.zebra;
@@ -332,31 +343,35 @@ function renderUI(cam, ln, sc, r) {
   // Readouts
   const pct = (x) => (x < 1 ? x.toFixed(2) : x.toFixed(1)) + '%';
   $('ro-fov').textContent = `${r.fovH.toFixed(1)}° × ${r.fovV.toFixed(1)}°`;
-  $('ro-fov-sub').textContent = `${r.fovD.toFixed(1)}° diagonal`;
+  $('ro-fov-sub').textContent = t('ro.fovSub', { d: r.fovD.toFixed(1) });
   $('ro-eq').textContent = `${Math.round(r.fEq)} mm · f/${fmtN(r.NEq)}`;
-  $('ro-eq-sub').textContent = `crop ×${r.crop.toFixed(2)} vs full frame`;
+  $('ro-eq-sub').textContent = t('ro.eqSub', { c: r.crop.toFixed(2) });
   const dofTotal = r.dof.far - r.dof.near;
   $('ro-dof').textContent = `${fmtDist(r.dof.near)} – ${fmtDist(r.dof.far)}`;
-  $('ro-dof-sub').textContent = isFinite(dofTotal) ? `${fmtDist(dofTotal)} deep · hyperfocal ${fmtDist(r.dof.hyperfocal)}` : `to infinity · hyperfocal ${fmtDist(r.dof.hyperfocal)}`;
+  $('ro-dof-sub').textContent = isFinite(dofTotal)
+    ? t('ro.dofSub', { deep: fmtDist(dofTotal), h: fmtDist(r.dof.hyperfocal) })
+    : t('ro.dofSubInf', { h: fmtDist(r.dof.hyperfocal) });
   $('ro-bg').textContent = `${(r.bgBlurMM).toFixed(2)} mm`;
-  $('ro-bg-sub').textContent = `${pct(r.bgBlurPct)} of frame width at ∞`;
+  $('ro-bg-sub').textContent = t('ro.bgSub', { pct: pct(r.bgBlurPct) });
   $('ro-pupil').textContent = `${r.pupilMM.toFixed(1)} mm`;
-  $('ro-pupil-sub').textContent = r.mag > 0.05 ? `magnification 1:${(1 / r.mag).toFixed(1)} · effective f/${fmtN(r.Neff)}` : `magnification 1:${Math.round(1 / r.mag)}`;
+  $('ro-pupil-sub').textContent = r.mag > 0.05
+    ? t('ro.pupilSubMacro', { m: (1 / r.mag).toFixed(1), n: fmtN(r.Neff) })
+    : t('ro.pupilSub', { m: Math.round(1 / r.mag) });
   $('ro-airy').textContent = `${(r.airyMM * 1000).toFixed(1)} µm`;
-  $('ro-airy-sub').textContent = `pixel ${(r.pitchMM * 1000).toFixed(2)} µm · softens past f/${fmtN(r.dlaN)}`;
-  $('ro-shake').textContent = state.support === 'tripod' ? 'none' : `${r.shakePx.toFixed(1)} px`;
-  $('ro-shake-sub').textContent = state.support === 'tripod' ? 'on a tripod' : `safe handheld ≤ ${fmtShutter(Math.min(1, r.safeShutter))}`;
+  $('ro-airy-sub').textContent = t('ro.airySub', { p: (r.pitchMM * 1000).toFixed(2), n: fmtN(r.dlaN) });
+  $('ro-shake').textContent = state.support === 'tripod' ? t('ro.shakeNone') : `${r.shakePx.toFixed(1)} px`;
+  $('ro-shake-sub').textContent = state.support === 'tripod' ? t('ro.shakeTripod') : t('ro.shakeSub', { t: fmtShutter(Math.min(1, r.safeShutter)) });
   $('ro-noise').textContent = `${Math.round(r.snr8)}:1`;
-  $('ro-noise-sub').textContent = `mid-grey SNR at 8 MP · DR ${r.dr.toFixed(1)} EV`;
+  $('ro-noise-sub').textContent = t('ro.noiseSub', { dr: r.dr.toFixed(1) });
 
   // Warnings
   const warn = [];
-  if (!r.icOk) warn.push(['bad', `Image circle ${ln.imageCircle} mm is smaller than this ${r.diag.toFixed(1)} mm sensor diagonal: dark corners.`]);
-  if (r.focusM <= ln.minFocus + 1e-6 && state.afTracksSubject && dot3(sub3(sc.camera.subject, shot.eye), shot.basis.f) < ln.minFocus) warn.push(['warn', `Subject is closer than the ${fmtDist(ln.minFocus)} minimum focus distance.`]);
-  if (state.support !== 'tripod' && r.t > r.safeShutter * 1.05) warn.push(['warn', `Shutter is slower than the safe handheld speed; expect shake blur.`]);
-  if (r.Neff > r.dlaN * 1.25) warn.push(['info', `Past f/${fmtN(r.dlaN)} diffraction softens this sensor's pixels.`]);
-  if (Math.abs(r.evOffset) > 0.4 && state.mode !== 'A') warn.push(['warn', `Exposure is ${fmtEV(r.evOffset)} EV from the meter.`]);
-  $('warnings').innerHTML = warn.map(([k, t]) => `<li class="chip-${k}">${t}</li>`).join('');
+  if (!r.icOk) warn.push(['bad', t('warn.ic', { ic: ln.imageCircle, d: r.diag.toFixed(1) })]);
+  if (r.focusM <= ln.minFocus + 1e-6 && state.afTracksSubject && dot3(sub3(sc.camera.subject, shot.eye), shot.basis.f) < ln.minFocus) warn.push(['warn', t('warn.minFocus', { d: fmtDist(ln.minFocus) })]);
+  if (state.support !== 'tripod' && r.t > r.safeShutter * 1.05) warn.push(['warn', t('warn.shake')]);
+  if (r.Neff > r.dlaN * 1.25) warn.push(['info', t('warn.diffraction', { n: fmtN(r.dlaN) })]);
+  if (Math.abs(r.evOffset) > 0.4 && state.mode !== 'A') warn.push(['warn', t('warn.exposure', { ev: fmtEV(r.evOffset) })]);
+  $('warnings').innerHTML = warn.map(([k, text]) => `<li class="chip-${k}">${text}</li>`).join('');
 
   drawFocusScale(ln, r);
   drawMeter(state.mode === 'M' ? r.evOffset : state.ec);
@@ -426,7 +441,10 @@ function positionOverlay() {
   split.hidden = !state.comparing;
   split.style.left = `${state.split * w}px`;
   $('ab-labels').hidden = !state.comparing;
-  if (state.held) $('held-desc').textContent = state.held.desc;
+  if (state.held) {
+    const h = state.held;
+    $('held-desc').textContent = `${loc(h.cam)} · ${loc(h.lens)} · f/${fmtN(h.N)} ${fmtShutter(h.t)} ISO ${Math.round(h.iso)}`;
+  }
 }
 
 // --- Events ---------------------------------------------------------------------------------------
@@ -534,24 +552,29 @@ function holdA() {
   if (!renderer) return;
   renderer.capture();
   const cam = camera(), ln = lens();
-  state.held = {
-    desc: `${cam.short} · ${ln.name} · f/${fmtN(shot.N)} ${fmtShutter(shot.t)} ISO ${Math.round(shot.iso)}`,
-    loupeKey: loupeKey(),
-  };
+  state.held = { cam: { name: cam.short }, lens: ln, N: shot.N, t: shot.t, iso: shot.iso, loupeKey: loupeKey() };
   state.comparing = true;
-  $('hold').textContent = 'Replace A with this view';
+  $('hold').textContent = t('compare.replace');
   $('clear-hold').hidden = false;
   updateViews();
   renderer.present();
 }
 function clearHold() {
   state.comparing = false; state.held = null;
-  $('hold').textContent = 'Hold this view as A';
+  $('hold').textContent = t('compare.hold');
   $('clear-hold').hidden = true;
   renderer?.clearCapture();
   if (renderer && shot) updateViews();
 }
 $('hold').addEventListener('click', holdA);
+// Language: only the text changes, so the picture is not re-rendered.
+document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
+  if (b.dataset.lang === getLang()) return;
+  setLang(b.dataset.lang);
+  renderLabels();
+  if (lastUI) renderUI(...lastUI);
+  if (document.body.dataset.state === 'ready') $('status').textContent = t('status.ready');
+}));
 $('clear-hold').addEventListener('click', clearHold);
 
 new ResizeObserver(() => { if (shot) { if (state.comparing) clearHold(); updateViews(); renderer?.resetAll(); } }).observe($('viewfinder'));
@@ -565,7 +588,7 @@ async function boot() {
     const box = $('gpu-error');
     box.hidden = false;
     $('gpu-error-detail').textContent = String(err.message || err).startsWith('webgpu')
-      ? 'This browser did not provide a WebGPU device.'
+      ? t('gpu.noDevice')
       : String(err.message || err).slice(0, 600);
     document.body.dataset.state = 'error';
     return;
@@ -579,9 +602,9 @@ async function boot() {
       const p = Math.min(...r.progress);
       bar.style.setProperty('--p', p.toFixed(3));
       bar.dataset.done = String(!r.busy);
-      $('status').textContent = r.busy ? `Rendering ${Math.round(p * 100)}%` : 'Ready';
+      $('status').textContent = r.busy ? t('status.rendering', { p: Math.round(p * 100) }) : t('status.ready');
     }
-    if (renderer.errors.length) { $('status').textContent = 'GPU error'; console.error(renderer.errors.join('\n')); renderer.errors.length = 0; }
+    if (renderer.errors.length) { $('status').textContent = t('status.gpuError'); console.error(renderer.errors.join('\n')); renderer.errors.length = 0; }
     document.body.dataset.state = r.busy ? 'rendering' : 'ready';
     requestAnimationFrame(loop);
   };
