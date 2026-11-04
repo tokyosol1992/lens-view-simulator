@@ -61,7 +61,7 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | Path | Contents |
 | --- | --- |
 | `index.html` | Page, layout and styles |
-| `src/catalog.js` | Camera bodies, lenses, dial scales, white balance, picture styles |
+| `src/catalog.js` | Camera bodies and lenses (product classes and real products), dial scales, white balance, picture styles |
 | `src/optics.js` | Camera maths: FOV, DOF, hyperfocal, exposure, diffraction, noise, shake |
 | `src/scenes.js` | The four locations |
 | `src/main.js` | UI state, per-view camera parameters, readouts, focus scale, A/B |
@@ -71,15 +71,23 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `tools/check-optics.mjs` | `node tools/check-optics.mjs`: optics maths against textbook values |
 | `tools/check-wgsl.mjs` | Compiles every shader in headless Chromium and lists errors |
 | `tools/i18n-check.mjs` | Checks the language switch on desktop and phone widths: every label translated, no overflow, choice persists |
+| `tools/catalog-check.mjs` | Checks the catalog: every field present, unique ids, pixel counts match the sensor shape, real products marked and translated |
 | `tools/layout-check.mjs` | Checks the responsive layout without a GPU, at phone, tablet and desktop widths in both languages: no overflow, header not overlapping, picture and tabs pinned on narrow screens, one panel per tab, loupe keeps its size. `FONT_DIR=<pretendard folder>` measures with the real font offline |
 | `tools/interact.mjs` | Clicks to focus, holds A, refocuses and switches lens in headless Chromium |
 | `tools/shoot.mjs` | Renders setups headlessly and saves screenshots, e.g. `node tools/shoot.mjs out "scene=street&lens=p85&q=draft"` |
 
 A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `zoom` (loupe 1, 2 or 4), `wb`, `style`, `lang` (`en`, `ko`), `tab` (`gear`, `location`, `exposure`, `picture`, `results`: the panel shown on narrow screens) and `q` (`draft`, `standard`, `high`).
 
-## Adding products
+## Products
 
-Add an entry to `CAMERAS` or `LENSES` in `src/catalog.js`; the comments there describe each field. Give it a `ko: { name, note }` field for the Korean interface; without one, the English text is shown. The current entries describe product *classes* (for example "Full frame 24 MP" or "85mm f/1.4 portrait") with representative values. They are not measurements of specific commercial models. For a real catalogue, fill in the manufacturer's sensor size, pixel count, base ISO and blade count. Optical character values (distortion, CA, softness, flare) are best taken from lab measurements.
+The first entries in each list are product *classes* (for example "Full frame 24 MP" or "85mm f/1.4 portrait") with typical values. The entries under **Real products** are specific models:
+
+- Cameras: Sony α7 IV, Canon EOS R5, Nikon Z8, OM System OM-1, Fujifilm X-T5, Fujifilm GFX100 II.
+- Lenses: Canon RF 50mm F1.2 L USM, Sigma 35mm F1.4 DG DN Art, Sony FE 24mm F1.4 GM, Sony FE 14mm F1.8 GM, Nikon NIKKOR Z 50mm f/1.8 S, Sony FE 100mm F2.8 STF GM OSS, Sony FE 90mm F2.8 Macro G OSS, Fujifilm XF 23mm F1.4 R LM WR, Fujifilm GF 110mm F2 R LM WR.
+
+For these, the makers' own figures are used where they publish them: sensor size, pixel count, ISO range and stabilisation for bodies, and focal length, aperture range, blade count, closest focus and any T-stop for lenses (the STF's f/2.8 is T5.6, so it loses two stops). They were checked against maker or retailer spec listings on 2026-11-04. Where sources disagreed, the product was left out. Makers do not publish distortion, aberrations, softness, flare or sensor noise, so those values are copied from the nearest class (`basedOn` in `src/catalog.js`) and are **estimates, not measurements**; the page says so under the dropdowns. Please check these against the maker's page before relying on them: the GFX100 II's ISO range and stabilisation (from retailer listings), the low-pass filter of the α7 IV and the Fujifilm bodies (assumed), and the OM-1's image size (derived from 20.4 MP at 4:3). Lens mounts are not modelled, so any lens can be combined with any body; a lens that does not cover the sensor shows dark corners.
+
+To add a product, give `cameraFrom(baseClassId, { ... })` or `lensFrom(baseClassId, { ... })` the maker's figures and a `ko: { name, note }` for the Korean interface. To add a class entry, write a full object in `CAMERAS` or `LENSES`; the comments in `src/catalog.js` describe each field. Lab-measured optical values are better than class estimates when you have them. `node tools/catalog-check.mjs` checks that every field is present, ids are unique and pixel counts match the sensor's shape.
 
 ## Limits
 

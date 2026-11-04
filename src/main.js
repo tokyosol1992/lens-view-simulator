@@ -74,7 +74,13 @@ const fmtEV = (e) => (e >= 0 ? '+' : '−') + Math.abs(e).toFixed(1);
 
 // --- Populate controls (re-run when the language changes) ---------------------------------
 function fillSelect(el, items, value) {
-  el.innerHTML = items.map((it) => `<option value="${it.id}">${loc(it)}</option>`).join('');
+  const opt = (it) => `<option value="${it.id}">${loc(it)}</option>`;
+  const products = items.filter((it) => it.kind === 'product');
+  // Real products are listed under their own heading, after the product classes.
+  el.innerHTML = products.length
+    ? `<optgroup label="${t('catalog.classes')}">${items.filter((it) => it.kind !== 'product').map(opt).join('')}</optgroup>`
+      + `<optgroup label="${t('catalog.products')}">${products.map(opt).join('')}</optgroup>`
+    : items.map(opt).join('');
   el.value = value;
 }
 function renderLabels() {
@@ -294,12 +300,12 @@ function renderUI(cam, ln, sc, r) {
   document.querySelectorAll('[data-support]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.support === state.support)));
   document.querySelectorAll('[data-nd]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.nd === state.nd)));
   document.querySelectorAll('[data-zoom]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.zoom === state.loupeZoom)));
-  $('lens-note').textContent = loc(ln, 'note');
+  $('lens-note').textContent = loc(ln, 'note') + (ln.kind === 'product' ? ' ' + t('lens.estimated') : '');
   $('scene-note').textContent = loc(sc, 'blurb');
   $('cam-spec').textContent = t('cam.spec', {
     w: cam.sensor[0], h: cam.sensor[1], mp: O.megapixels(cam).toFixed(0),
     p: (O.pixelPitchMM(cam) * 1000).toFixed(2), aa: t(cam.aa ? 'cam.aa' : 'cam.noAa'),
-  });
+  }) + (cam.kind === 'product' ? ' ' + t('cam.estimated') : '');
 
   // Focal length
   const zoomRow = $('focal-row');
