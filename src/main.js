@@ -42,6 +42,12 @@ const state = {
   if (num('zoom') != null) state.loupeZoom = num('zoom');
   if (params.has('wb')) state.wb = params.get('wb');
   if (params.has('style')) state.style = params.get('style');
+  if (params.get('keep') === '0') state.keepFraming = false;
+  if (params.get('zebra') === '1') state.zebra = true;
+  if (params.get('grid') === '0') state.grid = false;
+  // Manual focus: distance in metres and the AF point (-1 to 1 across the frame).
+  if (num('focus') != null) { state.focusM = num('focus'); state.afTracksSubject = false; }
+  if (params.has('af')) { const a = params.get('af').split(',').map(parseFloat); if (a.length === 2 && a.every(Number.isFinite)) state.af = a; }
 }
 
 let renderer = null;
@@ -57,6 +63,14 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const camera = () => CAMERAS.find((c) => c.id === state.cameraId);
 const lens = () => LENSES.find((l) => l.id === state.lensId);
 const scene = () => getScene(state.sceneId);
+
+// A link can name something this version does not have (a removed product, a typo): fall back rather than fail.
+if (!CAMERAS.some((c) => c.id === state.cameraId)) state.cameraId = 'ff24';
+if (!LENSES.some((l) => l.id === state.lensId)) state.lensId = 'n50p';
+if (!SCENE_LIST.some((s) => s.id === state.sceneId)) state.sceneId = 'garden';
+if (!WHITE_BALANCE.some((w) => w.id === state.wb)) state.wb = 'auto';
+if (!STYLES.some((s) => s.id === state.style)) state.style = 'standard';
+if (![1, 2, 4].includes(state.loupeZoom)) state.loupeZoom = 1;
 
 // A scene can suggest a starting exposure (the night campsite needs ISO 3200 on a tripod). Leaving such a
 // scene puts ISO and support back, so a daylight scene never inherits it. Link parameters win at load.
@@ -471,6 +485,11 @@ function drawMeter(ev) {
   $('meter-val').textContent = `${fmtEV(ev)} EV`;
 }
 
+// "FF 24MP · 50mm f/1.2 premium · f/1.2 1/250 ISO 100", shown on both sides of a comparison.
+function describeSetup(camName, ln, N, t, iso) {
+  return `${camName} · ${loc(ln)} · f/${fmtN(N)} ${fmtShutter(t)} ISO ${Math.round(iso)}`;
+}
+
 function positionOverlay() {
   const vf = $('viewfinder');
   const af = $('af-box');
@@ -492,8 +511,9 @@ function positionOverlay() {
   $('ab-labels').hidden = !state.comparing;
   if (state.held) {
     const h = state.held;
-    $('held-desc').textContent = `${loc(h.cam)} · ${loc(h.lens)} · f/${fmtN(h.N)} ${fmtShutter(h.t)} ISO ${Math.round(h.iso)}`;
+    $('held-desc').textContent = describeSetup(h.cam.name, h.lens, h.N, h.t, h.iso);
   }
+  if (state.comparing && shot) $('live-desc').textContent = describeSetup(camera().short, lens(), shot.N, shot.t, shot.iso);
 }
 
 // --- Events ---------------------------------------------------------------------------------------
@@ -599,6 +619,16 @@ $('grid').addEventListener('change', (e) => { state.grid = e.target.checked; sch
   });
 })();
 
+// The divider can be moved from the keyboard too (Shift for bigger steps).
+$('split').addEventListener('keydown', (e) => {
+  const d = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+  if (!d && e.key !== 'Home' && e.key !== 'End') return;
+  e.preventDefault();
+  state.split = e.key === 'Home' ? 0 : e.key === 'End' ? 1 : clamp(state.split + d * (e.shiftKey ? 0.1 : 0.02), 0, 1);
+  $('split').setAttribute('aria-valuenow', String(Math.round(state.split * 100)));
+  updateViews(); renderer?.present();
+});
+
 // A/B compare
 // The Compare group and the phone's shortcut chip over the picture show the same state.
 function syncCompareUI() {
@@ -624,6 +654,61 @@ function clearHold() {
 }
 $('hold').addEventListener('click', holdA);
 $('hold-chip').addEventListener('click', () => (state.comparing ? clearHold() : holdA()));
+// --- Share link and reset -------------------------------------------------------------------------
+function shutterParam(t) { return t >= 0.3 ? String(+t.toFixed(2)) : '1/' + Math.round(1 / t); }
+// Everything that defines the picture, so the link reopens exactly this setup. Language is left out:
+// the person who opens it sees their own.
+function shareURL() {
+  const p = new URLSearchParams();
+  const ln = lens();
+  p.set('camera', state.cameraId); p.set('lens', state.lensId); p.set('scene', state.sceneId);
+  if (ln.focal[0] !== ln.focal[1]) p.set('focal', String(Math.round(state.focal)));
+  p.set('mode', state.mode);
+  p.set('f', String(+state.N.toFixed(2)));
+  if (state.mode !== 'MA') p.set('iso', String(Math.round(state.iso)));
+  if (state.mode !== 'A') p.set('t', shutterParam(state.shutter));
+  if (state.mode !== 'M') p.set('ec', String(+state.ec.toFixed(2)));
+  if (state.nd) p.set('nd', String(state.nd));
+  p.set('support', state.support);
+  p.set('dist', String(+state.distance.toFixed(2)));
+  if (!state.keepFraming) p.set('keep', '0');
+  if (state.loupeZoom !== 1) p.set('zoom', String(state.loupeZoom));
+  if (state.wb !== 'auto') p.set('wb', state.wb);
+  if (state.style !== 'standard') p.set('style', state.style);
+  if (state.zebra) p.set('zebra', '1');
+  if (!state.grid) p.set('grid', '0');
+  if (!state.afTracksSubject) { p.set('focus', String(+state.focusM.toFixed(3))); p.set('af', state.af.map((v) => +v.toFixed(3)).join(',')); }
+  if (state.quality !== 'standard') p.set('q', state.quality);
+  return `${location.origin}${location.pathname}?${p}`;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* fall back to a hidden field */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  ta.remove();
+  return ok;
+}
+let shareTimer = 0;
+$('share').addEventListener('click', async () => {
+  const ok = await copyText(shareURL());
+  $('share').textContent = t(ok ? 'share.copied' : 'share.failed');
+  clearTimeout(shareTimer);
+  shareTimer = setTimeout(() => { $('share').textContent = t('share.copy'); }, 2000);
+});
+// Back to the starting exposure, focus and picture settings. Camera, lens and location stay, and so does a held A.
+$('reset').addEventListener('click', () => {
+  Object.assign(state, SCENE_BASE, scene().defaults || {}, {
+    mode: 'A', ec: 0, nd: 0, wb: 'auto', style: 'standard', zebra: false, loupeZoom: 1, grid: true,
+    keepFraming: true, distance: null, afTracksSubject: true,
+  });
+  state.N = O.maxApertureAt(lens(), state.focal);
+  lastFEq = null;
+  schedule();
+});
+
 // Language: only the text changes, so the picture is not re-rendered.
 document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
   if (b.dataset.lang === getLang()) return;
@@ -700,5 +785,5 @@ async function boot() {
   if (params.get('manual')) window.__lvs.step = () => renderer.frame();
   else requestAnimationFrame(loop);
 }
-window.__lvs = { state, update, get renderer() { return renderer; } };
+window.__lvs = { state, update, shareURL, get renderer() { return renderer; } };
 boot();

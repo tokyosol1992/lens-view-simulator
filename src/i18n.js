@@ -21,6 +21,7 @@ const STRINGS = {
     'aria.meter': 'Exposure meter',
     'aria.loupe': 'Pixel-level crop at the focus point',
     'aria.zoom': 'Loupe magnification',
+    'aria.split': 'Comparison divider',
     'aria.mode': 'Exposure mode',
     'aria.tabs': 'Settings',
     'aria.nd': 'ND filter',
@@ -107,6 +108,10 @@ const STRINGS = {
     'compare.hold': 'Hold this view as A',
     'compare.replace': 'Replace A with this view',
     'compare.stop': 'Stop comparing',
+    'share.copy': 'Copy link',
+    'share.copied': 'Link copied',
+    'share.failed': 'Could not copy',
+    'reset.label': 'Reset settings',
   },
   ko: {
     'meta.title': '렌즈 뷰 시뮬레이터',
@@ -126,6 +131,7 @@ const STRINGS = {
     'aria.meter': '노출계',
     'aria.loupe': '초점 위치의 픽셀 단위 확대 화면',
     'aria.zoom': '확대 배율',
+    'aria.split': '비교 구분선',
     'aria.mode': '촬영 모드',
     'aria.tabs': '설정',
     'aria.nd': 'ND 필터',
@@ -212,6 +218,10 @@ const STRINGS = {
     'compare.hold': '이 화면을 A로 고정',
     'compare.replace': '이 화면으로 A 교체',
     'compare.stop': '비교 끝내기',
+    'share.copy': '링크 복사',
+    'share.copied': '링크를 복사했어요',
+    'share.failed': '복사하지 못했어요',
+    'reset.label': '설정 초기화',
   },
 };
 

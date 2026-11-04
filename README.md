@@ -1,10 +1,12 @@
 # Lens View Simulator
 
-A web page for camera and lens customers. Pick a camera body, a lens and a sample location, and the page renders the photograph that combination would produce, live, with WebGPU. Change any setting and the frame re-renders, so the differences between products show up in the picture itself. You can also hold one result as **A** and drag a divider to compare it with the live **B**.
+A web page for camera and lens customers. Pick a camera body, a lens and a sample location, and the page renders the photograph that combination would produce, live, with WebGPU. Change any setting and the frame re-renders, so the differences between products show up in the picture itself. You can also hold one result as **A** and drag a divider to compare it with the live **B**; both sides are labelled with their camera, lens and exposure, and the divider also moves with the arrow keys (Shift for bigger steps, Home and End for the edges).
 
 The interface is available in English and Korean. The **EN / 한국어** switch sits in the top bar on phones and desktops. It defaults to the browser language, remembers the choice in the browser, and can be set with `?lang=ko` or `?lang=en`. Switching language changes only the text, so the picture is not re-rendered.
 
 On wide screens the picture, focus scale, loupe and readouts are on the left and the settings are in a column on the right. On phones and narrow windows the picture, the focus scale and a tab bar stay pinned to the top, and the tabs (**Gear, Location, Exposure, Picture, Results**) choose which panel scrolls beneath them, so every change can be seen as it is made. A **Hold as A** chip over the picture starts a comparison without leaving the settings.
+
+**Copy link** (with **Reset settings**, under Picture) copies a link that reopens exactly this setup: gear, location, exposure, focus point and picture settings. A link that names something this version does not have still opens, with defaults. **Reset settings** puts exposure, focus and picture settings back to the start and keeps the gear, the location and a held A.
 
 The look follows a flat, one-accent style: surfaces step in lightness instead of using borders, blue is the only accent, controls are large, and the font is [Pretendard](https://github.com/orioncactus/pretendard) (SIL OFL), loaded from jsDelivr with Noto Sans KR and the system Korean font as fallbacks. Dark and light follow the system setting.
 
@@ -73,12 +75,13 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `tools/check-wgsl.mjs` | Compiles every shader in headless Chromium and lists errors |
 | `tools/i18n-check.mjs` | Checks the language switch on desktop and phone widths: every label translated, no overflow, choice persists |
 | `tools/scene-check.mjs` | Checks every location builds with complete data, has English and Korean text and at most 48 lights, and that the night scene's suggested exposure is applied and undone |
+| `tools/share-check.mjs` | Checks that a copied link reopens the same setup (four setups, round trip), that unknown ids fall back to defaults, that Copy link reaches the clipboard, and that Reset restores the starting settings |
 | `tools/catalog-check.mjs` | Checks the catalog: every field present, unique ids, pixel counts match the sensor shape, real products marked and translated |
 | `tools/layout-check.mjs` | Checks the responsive layout without a GPU, at phone, tablet and desktop widths in both languages: no overflow, header not overlapping, picture and tabs pinned on narrow screens, one panel per tab, loupe keeps its size. `FONT_DIR=<pretendard folder>` measures with the real font offline |
 | `tools/interact.mjs` | Clicks to focus, holds A, refocuses and switches lens in headless Chromium |
 | `tools/shoot.mjs` | Renders setups headlessly and saves screenshots, e.g. `node tools/shoot.mjs out "scene=street&lens=p85&q=draft"` |
 
-A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `zoom` (loupe 1, 2 or 4), `wb`, `style`, `lang` (`en`, `ko`), `tab` (`gear`, `location`, `exposure`, `picture`, `results`: the panel shown on narrow screens) and `q` (`draft`, `standard`, `high`).
+A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `keep` (`0` to let the subject size change with focal length), `focus` (m) and `af` (`x,y` from -1 to 1) for a manual focus point, `zoom` (loupe 1, 2 or 4), `grid` (`0` hides the loupe grid), `zebra` (`1` shows clipped highlights), `wb`, `style`, `lang` (`en`, `ko`), `tab` (`gear`, `location`, `exposure`, `picture`, `results`: the panel shown on narrow screens) and `q` (`draft`, `standard`, `high`).
 
 ## Products
 

@@ -154,6 +154,8 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .progress { position: absolute; left: 0; top: 0; height: 3px; width: calc(var(--p, 0) * 100%); background: var(--blue-text); transition: opacity 0.4s; }
 .progress[data-done="true"] { opacity: 0; }
 .split { position: absolute; top: 0; bottom: 0; width: 0; pointer-events: none; border-left: 2px solid #fff; }
+.split:focus-visible { outline: none; }
+.split:focus-visible::before { outline: 2px solid var(--blue-text); outline-offset: 2px; }
 .split::before { content: "⟷"; position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); width: 32px; height: 32px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; font-size: 15px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); }
 .ab-labels { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; gap: 8px; }
 .ab-labels span { font-size: 12px; line-height: 16px; font-weight: 600; color: #fff; background: rgba(0, 0, 0, 0.6); padding: 4px 10px; border-radius: 12px; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -320,8 +322,8 @@ label.field { display: grid; gap: 6px; }
       <div class="viewfinder" id="viewfinder">
         <canvas id="view" aria-label="Rendered photograph. Click to focus there." data-i18n-aria="aria.view"></canvas>
         <div class="af" id="af-box" aria-hidden="true"></div>
-        <div class="split" id="split" hidden></div>
-        <div class="ab-labels" id="ab-labels" hidden><span>A · <span id="held-desc"></span></span><span data-i18n="ab.live">B · live</span></div>
+        <div class="split" id="split" hidden role="slider" tabindex="0" aria-label="Comparison divider" data-i18n-aria="aria.split" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
+        <div class="ab-labels" id="ab-labels" hidden><span>A · <span id="held-desc"></span></span><span><span data-i18n="ab.live">B · live</span> · <span id="live-desc"></span></span></div>
         <div class="progress" id="progress"></div>
         <button type="button" class="vf-chip" id="hold-chip" data-i18n="chip.hold">Hold as A</button>
         <div class="vf-info" aria-live="off">
@@ -456,6 +458,10 @@ label.field { display: grid; gap: 6px; }
         <label class="field"><span class="field-label" data-i18n="field.style">Style</span><select id="style"></select></label>
       </div>
       <label class="check"><input type="checkbox" id="zebra"> <span data-i18n="field.zebra">Show clipped highlights</span></label>
+      <div class="row2">
+        <button type="button" class="btn btn-weak" id="share" data-i18n="share.copy">Copy link</button>
+        <button type="button" class="btn" id="reset" data-i18n="reset.label">Reset settings</button>
+      </div>
     </section>
 
     <section class="group" data-panel="compare">
