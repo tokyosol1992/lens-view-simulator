@@ -4,6 +4,8 @@ A web page for camera and lens customers. Pick a camera body, a lens and a sampl
 
 The interface is available in English and Korean. The **EN / 한국어** switch sits in the top bar on phones and desktops. It defaults to the browser language, remembers the choice in the browser, and can be set with `?lang=ko` or `?lang=en`. Switching language changes only the text, so the picture is not re-rendered.
 
+The layout keeps the picture and the dials in view together. On wide screens the settings column stays on screen while the page scrolls, and scrolls on its own if it is taller than the window. On phones and narrow windows the viewfinder is pinned to the top of the screen, so every change to aperture, ISO or focus can be seen as it is made; the loupe and readouts come after the dials. **Hold this view as A** sits above the picture, and **Focus on subject** beside the focus scale.
+
 The page is static: no build step and no dependencies.
 
 ```sh
@@ -67,6 +69,7 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `tools/check-optics.mjs` | `node tools/check-optics.mjs`: optics maths against textbook values |
 | `tools/check-wgsl.mjs` | Compiles every shader in headless Chromium and lists errors |
 | `tools/i18n-check.mjs` | Checks the language switch on desktop and phone widths: every label translated, no overflow, choice persists |
+| `tools/layout-check.mjs` | Checks the responsive layout without a GPU: no horizontal overflow at phone, tablet and desktop widths, the viewfinder pinned on narrow screens, the settings column pinned on wide ones |
 | `tools/interact.mjs` | Clicks to focus, holds A, refocuses and switches lens in headless Chromium |
 | `tools/shoot.mjs` | Renders setups headlessly and saves screenshots, e.g. `node tools/shoot.mjs out "scene=street&lens=p85&q=draft"` |
 

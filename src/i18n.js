@@ -1,5 +1,5 @@
-// Interface text in English and Korean. Static markup uses data-i18n (text) and
-// data-i18n-aria (aria-label) attributes; scripts call t(key, vars).
+// Interface text in English and Korean. Static markup uses data-i18n (text),
+// data-i18n-aria (aria-label) and data-i18n-title (tooltip) attributes; scripts call t(key, vars).
 // Catalog and scene entries carry their own `ko` names and notes, read with loc().
 
 const STRINGS = {
@@ -29,7 +29,7 @@ const STRINGS = {
     'gpu.help': 'Open this page in a current Chrome, Edge or Safari with WebGPU turned on. The readouts below still update.',
     'gpu.noDevice': 'This browser did not provide a WebGPU device.',
     'strip.focus': 'Focus',
-    'strip.hint': '· drag the scale or click the picture',
+    'strip.hint': 'Drag the scale or click the picture to focus.',
     'strip.exposure': 'Exposure',
     'focus.subject': 'Subject',
     'focus.manual': 'Manual',
@@ -82,24 +82,22 @@ const STRINGS = {
     'field.ec': 'Exposure compensation',
     'field.nd': 'ND filter',
     'nd.0': 'None',
-    'nd.3': 'ND8 · 3 stops',
-    'nd.6': 'ND64 · 6',
-    'nd.10': 'ND1000 · 10',
+    'nd.3': 'ND8\n3 stops',
+    'nd.6': 'ND64\n6 stops',
+    'nd.10': 'ND1000\n10 stops',
     'support.tripod': 'Tripod',
     'support.stabilized': 'Handheld + IS',
     'support.handheld': 'Handheld',
-    'group.focus': 'Focus',
-    'focus.note': 'Click anywhere in the picture to focus there.',
     'focus.refocus': 'Focus on subject',
     'group.picture': 'Picture',
     'field.wb': 'White balance',
     'field.style': 'Style',
     'field.zebra': 'Show clipped highlights',
-    'group.compare': 'Compare',
     'compare.note': 'Hold the current picture as A, then change anything. Drag the divider on the picture to compare A with the live B.',
     'compare.hold': 'Hold this view as A',
     'compare.replace': 'Replace A with this view',
     'compare.stop': 'Stop comparing',
+    'compare.drag': 'Drag the divider to compare A with the live B.',
   },
   ko: {
     'meta.title': '렌즈 뷰 시뮬레이터',
@@ -127,7 +125,7 @@ const STRINGS = {
     'gpu.help': 'WebGPU를 켠 최신 Chrome, Edge, Safari에서 열어 주세요. 아래 수치는 계속 갱신됩니다.',
     'gpu.noDevice': '이 브라우저가 WebGPU 장치를 제공하지 않았습니다.',
     'strip.focus': '초점',
-    'strip.hint': '· 눈금을 끌거나 사진을 클릭',
+    'strip.hint': '눈금을 끌거나 사진을 클릭해 초점을 맞춥니다.',
     'strip.exposure': '노출',
     'focus.subject': '피사체',
     'focus.manual': '수동',
@@ -180,24 +178,22 @@ const STRINGS = {
     'field.ec': '노출 보정',
     'field.nd': 'ND 필터',
     'nd.0': '없음',
-    'nd.3': 'ND8 · 3스톱',
-    'nd.6': 'ND64 · 6',
-    'nd.10': 'ND1000 · 10',
+    'nd.3': 'ND8\n3스톱',
+    'nd.6': 'ND64\n6스톱',
+    'nd.10': 'ND1000\n10스톱',
     'support.tripod': '삼각대',
     'support.stabilized': '핸드헬드 + 보정',
     'support.handheld': '핸드헬드',
-    'group.focus': '초점',
-    'focus.note': '사진의 아무 곳이나 클릭하면 그곳에 초점을 맞춥니다.',
     'focus.refocus': '피사체에 초점',
     'group.picture': '사진',
     'field.wb': '화이트 밸런스',
     'field.style': '스타일',
     'field.zebra': '하이라이트가 날아간 부분 표시',
-    'group.compare': '비교',
     'compare.note': '지금 화면을 A로 고정한 뒤 아무 설정이나 바꾸세요. 사진 위 구분선을 끌어 A와 실시간 B를 비교합니다.',
     'compare.hold': '이 화면을 A로 고정',
     'compare.replace': '이 화면으로 A 교체',
     'compare.stop': '비교 끝내기',
+    'compare.drag': '구분선을 끌어 A와 실시간 B를 비교하세요.',
   },
 };
 
@@ -239,6 +235,7 @@ export function loc(item, field = 'name') {
 export function applyStatic(root = document) {
   root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
   root.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+  root.querySelectorAll('[data-i18n-title]').forEach((el) => { el.setAttribute('title', t(el.dataset.i18nTitle)); });
   document.title = t('meta.title');
   document.querySelector('meta[name="description"]')?.setAttribute('content', t('meta.description'));
   document.querySelectorAll('[data-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));

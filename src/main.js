@@ -213,6 +213,7 @@ function updateViews() {
   const vf = $('viewfinder');
   const aspect = `${W} / ${H}`;
   if (vf.style.aspectRatio !== aspect) vf.style.aspectRatio = aspect;
+  vf.style.setProperty('--ar', (W / H).toFixed(4));
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cssW = vf.clientWidth;
   const outW = Math.max(64, Math.min(q.cap, Math.round(cssW * dpr * q.scale)));
@@ -295,6 +296,8 @@ function renderUI(cam, ln, sc, r) {
   document.querySelectorAll('[data-zoom]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.zoom === state.loupeZoom)));
   $('lens-note').textContent = loc(ln, 'note');
   $('scene-note').textContent = loc(sc, 'blurb');
+  $('setup-body').textContent = loc(cam);
+  $('setup-lens').textContent = loc(ln);
   $('cam-spec').textContent = t('cam.spec', {
     w: cam.sensor[0], h: cam.sensor[1], mp: O.megapixels(cam).toFixed(0),
     p: (O.pixelPitchMM(cam) * 1000).toFixed(2), aa: t(cam.aa ? 'cam.aa' : 'cam.noAa'),
@@ -327,6 +330,7 @@ function renderUI(cam, ln, sc, r) {
   $('keep').checked = state.keepFraming;
   $('focus-val').textContent = fmtDist(r.focusM);
   $('focus-src').textContent = t(state.afTracksSubject ? 'focus.subject' : 'focus.manual');
+  $('refocus').disabled = state.afTracksSubject;
 
   // Picture
   $('wb').value = state.wb; $('style').value = state.style; $('zebra').checked = state.zebra;
@@ -373,53 +377,80 @@ function renderUI(cam, ln, sc, r) {
   if (Math.abs(r.evOffset) > 0.4 && state.mode !== 'A') warn.push(['warn', t('warn.exposure', { ev: fmtEV(r.evOffset) })]);
   $('warnings').innerHTML = warn.map(([k, text]) => `<li class="chip-${k}">${text}</li>`).join('');
 
-  drawFocusScale(ln, r);
-  drawMeter(state.mode === 'M' ? r.evOffset : state.ec);
+  redrawScales();
+  document.querySelectorAll('input[type="range"]').forEach(syncRange);
   positionOverlay();
 }
 
+// Slider track is filled up to the thumb (read by the CSS as --fill).
+function syncRange(el) {
+  const min = +el.min || 0, max = +el.max || 100;
+  const f = max > min ? clamp((+el.value - min) / (max - min), 0, 1) : 0;
+  el.style.setProperty('--fill', `${(f * 100).toFixed(1)}%`);
+}
+function redrawScales() {
+  if (!lastUI) return;
+  const r = lastUI[3];
+  drawFocusScale(lastUI[1], r);
+  drawMeter(state.mode === 'M' ? r.evOffset : state.ec);
+}
+
 // --- Focus scale (lens barrel style, linear in 1/distance) ----------------------------------
+const FS_PAD = 22;
 function focusT(d, dmin) { return d === Infinity || d > 1e4 ? 1 : clamp(1 - dmin / d, 0, 1); }
 function focusFromT(t, dmin) { return t >= 0.999 ? 1e4 : dmin / (1 - t); }
 function drawFocusScale(ln, r) {
   const svg = $('focus-scale');
-  const W = svg.clientWidth || 600, Hh = 56;
+  const W = svg.clientWidth || 600, Hh = 58;
   svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
-  const pad = 14, w = W - pad * 2;
-  const x = (d) => pad + focusT(d, ln.minFocus) * w;
+  const w = W - FS_PAD * 2;
+  const x = (d) => FS_PAD + focusT(d, ln.minFocus) * w;
   const marks = [0.25, 0.3, 0.4, 0.5, 0.7, 1, 1.5, 2, 3, 5, 10, 20, Infinity].filter((d) => d >= ln.minFocus - 1e-6);
-  let s = `<line x1="${pad}" y1="30" x2="${pad + w}" y2="30" class="fs-axis"/>`;
-  const nearX = x(r.dof.near), farX = x(r.dof.far);
-  s += `<rect x="${nearX}" y="22" width="${Math.max(2, farX - nearX)}" height="16" rx="2" class="fs-dof"/>`;
-  const hx = x(r.dof.hyperfocal);
-  s += `<line x1="${hx}" y1="18" x2="${hx}" y2="42" class="fs-hyper"/><text x="${hx}" y="54" class="fs-hyper-t">H</text>`;
-  let lastX = -99;
-  for (const d of marks) {
-    const mx = x(d);
-    s += `<line x1="${mx}" y1="26" x2="${mx}" y2="34" class="fs-tick"/>`;
-    if (mx - lastX > 22) { s += `<text x="${mx}" y="14" class="fs-label">${d === Infinity ? '∞' : d < 1 ? d.toFixed(d < 0.5 ? 2 : 1).replace(/^0/, '') : d}</text>`; lastX = mx; }
+  // Labels are chosen by importance so that ∞ and the round numbers survive on narrow screens.
+  const order = [Infinity, 1, 2, 5, 0.5, 10, 3, 0.7, 1.5, 0.4, 0.3, 20, 0.25];
+  const labelled = [];
+  for (const d of order) {
+    if (marks.includes(d) && labelled.every((o) => Math.abs(x(o) - x(d)) > 25)) labelled.push(d);
   }
+  let s = `<rect x="${FS_PAD - 8}" y="19" width="${w + 16}" height="19" rx="6" class="fs-barrel"/>`;
+  const nearX = x(r.dof.near), farX = x(r.dof.far);
+  const dofW = Math.max(3, farX - nearX);
+  s += `<rect x="${nearX}" y="21" width="${dofW}" height="15" rx="3" class="fs-dof"/>`;
+  s += `<line x1="${nearX}" y1="21" x2="${nearX}" y2="36" class="fs-dof-edge"/><line x1="${nearX + dofW}" y1="21" x2="${nearX + dofW}" y2="36" class="fs-dof-edge"/>`;
+  const hx = x(r.dof.hyperfocal);
+  s += `<line x1="${hx}" y1="16" x2="${hx}" y2="40" class="fs-hyper"/><text x="${hx}" y="53" class="fs-hyper-t">H</text>`;
+  for (const d of marks) {
+    const mx = x(d), big = labelled.includes(d);
+    s += `<line x1="${mx}" y1="${big ? 22 : 24}" x2="${mx}" y2="${big ? 34 : 32}" class="fs-tick${big ? '' : ' minor'}"/>`;
+    if (big) s += `<text x="${mx}" y="12" class="fs-label">${d === Infinity ? '∞' : d}</text>`;
+  }
+  s += `<text x="${FS_PAD - 8}" y="53" class="fs-unit">m</text>`;
   svg.setAttribute('aria-valuetext', fmtDist(r.focusM));
   const fx = x(r.focusM);
-  s += `<path d="M${fx} 20 l-6 -9 h12 z" class="fs-pointer"/><line x1="${fx}" y1="20" x2="${fx}" y2="40" class="fs-pointer-line"/>`;
+  s += `<line x1="${fx}" y1="16" x2="${fx}" y2="40" class="fs-pointer-line"/><path d="M${fx} 39 l-6 10 h12 z" class="fs-pointer"/>`;
   svg.innerHTML = s;
 }
 function drawMeter(ev) {
   const svg = $('meter');
-  const W = 220, Hh = 34;
-  const pad = 10, w = W - pad * 2;
+  const W = svg.clientWidth || 270, Hh = 40;
+  const pad = 14, w = W - pad * 2;
   const x = (e) => pad + (clamp(e, -3, 3) + 3) / 6 * w;
-  let s = '';
+  // Pointer above the scale, tick marks below it, numbers last: nothing overlaps.
+  let s = `<line x1="${x(-3)}" y1="14" x2="${x(3)}" y2="14" class="m-axis"/>`;
+  const ex = x(ev);
+  s += `<rect x="${Math.min(x(0), ex)}" y="12" width="${Math.abs(ex - x(0)) || 1.5}" height="4" rx="1" class="m-bar"/>`;
   for (let e = -3; e <= 3.001; e += 1 / 3) {
     const major = Math.abs(e - Math.round(e)) < 1e-6;
-    s += `<line x1="${x(e)}" y1="${major ? 6 : 10}" x2="${x(e)}" y2="16" class="${major ? 'm-major' : 'm-minor'}"/>`;
-    if (major) s += `<text x="${x(e)}" y="30" class="m-label">${e === 0 ? '0' : (e > 0 ? '+' : '−') + Math.abs(Math.round(e))}</text>`;
+    s += `<line x1="${x(e)}" y1="15" x2="${x(e)}" y2="${major ? 24 : 20}" class="${major ? 'm-major' : 'm-minor'}"/>`;
+    if (major) {
+      const n = Math.round(e);
+      s += `<text x="${x(e)}" y="36" class="m-label${n === 0 ? ' zero' : ''}">${n === 0 ? '0' : (n > 0 ? '+' : '−') + Math.abs(n)}</text>`;
+    }
   }
-  const ex = x(ev);
-  s += `<rect x="${Math.min(x(0), ex)}" y="17" width="${Math.abs(ex - x(0)) || 1.5}" height="3" class="m-bar"/>`;
-  s += `<path d="M${ex} 21 l-4 6 h8 z" class="m-pointer"/>`;
+  s += `<path d="M${ex} 11 l-5 -9 h10 z" class="m-pointer"/>`;
   svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
   svg.innerHTML = s;
+  $('meter-val').textContent = `${fmtEV(ev)} EV`;
 }
 
 function positionOverlay() {
@@ -441,6 +472,8 @@ function positionOverlay() {
   split.hidden = !state.comparing;
   split.style.left = `${state.split * w}px`;
   $('ab-labels').hidden = !state.comparing;
+  $('compare-hint').hidden = !state.comparing;
+  $('setup').hidden = state.comparing;
   if (state.held) {
     const h = state.held;
     $('held-desc').textContent = `${loc(h.cam)} · ${loc(h.lens)} · f/${fmtN(h.N)} ${fmtShutter(h.t)} ISO ${Math.round(h.iso)}`;
@@ -492,7 +525,7 @@ $('grid').addEventListener('change', (e) => { state.grid = e.target.checked; sch
   let dragging = false;
   const set = (ev) => {
     const rect = svg.getBoundingClientRect();
-    const t = clamp((ev.clientX - rect.left - 14) / (rect.width - 28), 0, 1);
+    const t = clamp((ev.clientX - rect.left - FS_PAD) / (rect.width - FS_PAD * 2), 0, 1);
     state.focusM = focusFromT(t, lens().minFocus);
     state.afTracksSubject = false;
     schedule();
@@ -578,6 +611,20 @@ document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('clic
 $('clear-hold').addEventListener('click', clearHold);
 
 new ResizeObserver(() => { if (shot) { if (state.comparing) clearHold(); updateViews(); renderer?.resetAll(); } }).observe($('viewfinder'));
+// The settings column scrolls on its own on wide screens: fade the edge that has more beyond it.
+(() => {
+  const c = document.querySelector('.controls');
+  const edge = () => {
+    c.classList.toggle('more-above', c.scrollTop > 4);
+    c.classList.toggle('more-below', c.scrollTop + c.clientHeight < c.scrollHeight - 4);
+  };
+  c.addEventListener('scroll', edge, { passive: true });
+  const ro = new ResizeObserver(edge);
+  ro.observe(c);
+  c.querySelectorAll('.group').forEach((g) => ro.observe(g));
+})();
+new ResizeObserver(redrawScales).observe($('focus-scale'));
+new ResizeObserver(redrawScales).observe($('meter'));
 
 // --- Boot ------------------------------------------------------------------------------------------
 async function boot() {
