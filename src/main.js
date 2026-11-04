@@ -58,6 +58,20 @@ const camera = () => CAMERAS.find((c) => c.id === state.cameraId);
 const lens = () => LENSES.find((l) => l.id === state.lensId);
 const scene = () => getScene(state.sceneId);
 
+// A scene can suggest a starting exposure (the night campsite needs ISO 3200 on a tripod). Leaving such a
+// scene puts ISO and support back, so a daylight scene never inherits it. Link parameters win at load.
+const SCENE_BASE = { iso: 100, support: 'stabilized' };
+function applySceneDefaults(prev, next) {
+  if (prev?.defaults || next.defaults) Object.assign(state, SCENE_BASE, next.defaults || {});
+}
+{
+  const d = scene().defaults;
+  if (d) {
+    if (!params.has('iso') && d.iso) state.iso = d.iso;
+    if (!params.has('support') && d.support) state.support = d.support;
+  }
+}
+
 // --- Formatting -----------------------------------------------------------------------
 const fmtN = (n) => (n < 10 ? n.toFixed(1).replace(/\.0$/, '') : Math.round(n).toString());
 function fmtShutter(t) {
@@ -499,7 +513,9 @@ $('focal').addEventListener('input', (e) => { state.focal = +e.target.value; sch
 $('scenes').addEventListener('click', (e) => {
   const b = e.target.closest('[data-scene]');
   if (!b) return;
+  const prevScene = scene();
   state.sceneId = b.dataset.scene;
+  applySceneDefaults(prevScene, scene());
   state.distance = null; state.afTracksSubject = true; lastFEq = null;
   clearHold();
   if (renderer) renderer.setScene(scene());

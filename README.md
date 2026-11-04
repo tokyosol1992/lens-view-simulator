@@ -31,12 +31,13 @@ WebGPU needs a secure context (`https://` or `localhost`) and a browser that shi
 | Pixel count, low-pass filter, colour filter | Shown in the **100% loupe**. It is rendered at the camera's own pixel pitch through a Bayer or 6×6 colour filter and the optional low-pass filter, then demosaiced. This is where resolution, moiré, false colour and per-pixel noise become visible. |
 | White balance, picture style | Camera-JPEG style development with a highlight shoulder |
 
-The four locations are designed to expose these differences:
+The five locations are designed to expose these differences:
 
 - **Garden bench, golden hour.** A backlit teddy bear in front of string lights, leaf gaps and a low sun.
 - **City street at night.** Lamps, neon, wet asphalt and moving cars. Use it for ISO noise, light trails and point-light bokeh.
 - **Mountain lake, afternoon.** A pier leading to snowy peaks. Use it for distortion, haze, hyperfocal focusing and diffraction at f/16.
 - **Studio test bench.** A Siemens star, a zone plate, fine fabric, a colour chart, a ruler running through focus and a spinning fan.
+- **Starlit campsite.** A glowing tent, a small fire, a lantern and a starry sky over low hills. Use it for coma and astigmatism in the corners of fast wide lenses, noise at high ISO, long exposures, and focusing: the tent is 8 m away and the stars are at infinity, so click a star to focus there. It is the only location that suggests a starting exposure (ISO 3200 on a tripod); switching to another location puts ISO and support back.
 
 ## How it is rendered
 
@@ -63,7 +64,7 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `index.html` | Page, layout and styles |
 | `src/catalog.js` | Camera bodies and lenses (product classes and real products), dial scales, white balance, picture styles |
 | `src/optics.js` | Camera maths: FOV, DOF, hyperfocal, exposure, diffraction, noise, shake |
-| `src/scenes.js` | The four locations |
+| `src/scenes.js` | The five locations |
 | `src/main.js` | UI state, per-view camera parameters, readouts, focus scale, A/B |
 | `src/i18n.js` | English and Korean interface text, language detection and switching |
 | `src/gpu/renderer.js` | WebGPU resources and pass orchestration |
@@ -71,6 +72,7 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `tools/check-optics.mjs` | `node tools/check-optics.mjs`: optics maths against textbook values |
 | `tools/check-wgsl.mjs` | Compiles every shader in headless Chromium and lists errors |
 | `tools/i18n-check.mjs` | Checks the language switch on desktop and phone widths: every label translated, no overflow, choice persists |
+| `tools/scene-check.mjs` | Checks every location builds with complete data, has English and Korean text and at most 48 lights, and that the night scene's suggested exposure is applied and undone |
 | `tools/catalog-check.mjs` | Checks the catalog: every field present, unique ids, pixel counts match the sensor shape, real products marked and translated |
 | `tools/layout-check.mjs` | Checks the responsive layout without a GPU, at phone, tablet and desktop widths in both languages: no overflow, header not overlapping, picture and tabs pinned on narrow screens, one panel per tab, loupe keeps its size. `FONT_DIR=<pretendard folder>` measures with the real font offline |
 | `tools/interact.mjs` | Clicks to focus, holds A, refocuses and switches lens in headless Chromium |

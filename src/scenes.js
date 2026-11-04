@@ -514,12 +514,85 @@ function bench() {
   };
 }
 
-const BUILDERS = { garden, street, lake, bench };
+// A starlit campsite: a glowing tent, a small fire and a lantern under a dark sky, with low hills on the horizon. Almost everything
+// is lit by a few warm sources, so it shows how a lens renders stars (coma and astigmatism toward the
+// corners of fast wide lenses), how far a long exposure and a high ISO can be pushed, and where to focus
+// when the subject is 8 m away and the stars are at infinity. Radiance is relative to the scene's own
+// exposure reference (ev100 −5.5), so the sky sits near 0.02 and the tent near 2.
+function camp() {
+  const b = new Builder();
+  const R = rng(41);
+  b.plane([0, 0, 40], [220, 220], MAT.GRASS, [0.02, 0.03, 0.015]);
+  b.plane([0, 0, 8000], [32000, 32000], MAT.GRASS, [0.015, 0.02, 0.012]);
+
+  // Dome tent that glows from inside, with guy lines and pegs
+  const tent = [0, 0, 0], glow = [1.0, 0.52, 0.2];
+  b.ball([tent[0], 0, tent[2]], [1.9, 1.35, 1.6], MAT.EMIT, glow, { p1: [2.4, 0, 0, 0] });
+  b.box([tent[0], 0.36, tent[2] - 0.8], [0.5, 0.72, 0.03], MAT.EMIT, [0.7, 0.32, 0.1], { p1: [0.9, 0, 0, 0] });
+  b.rod([tent[0], 0.02, tent[2] - 0.83], [tent[0], 0.72, tent[2] - 0.83], 0.006, MAT.DIFFUSE, [0.04, 0.03, 0.02]);
+  b.rod([tent[0] - 0.9, 0.58, tent[2] - 0.2], [tent[0] - 1.8, 0.0, tent[2] - 1.1], 0.004, MAT.DIFFUSE, [0.05, 0.05, 0.05]);
+  b.rod([tent[0] + 0.9, 0.58, tent[2] - 0.2], [tent[0] + 1.8, 0.0, tent[2] - 1.1], 0.004, MAT.DIFFUSE, [0.05, 0.05, 0.05]);
+  for (const x of [-1.8, 1.8]) b.cyl([tent[0] + x, 0.03, tent[2] - 1.1], [0.015, 0.06, 0.015], MAT.METAL, [0.5, 0.5, 0.5], { p1: [0.4, 0, 0, 0] });
+  b.light([tent[0], 0.6, tent[2] - 1.4], glow, 1.4, { radius: 0.9 });
+
+  // Campfire with logs, embers and flames
+  const fire = [1.7, 0, -1.0];
+  for (let k = 0; k < 5; k++) {
+    const a = k * 1.25 + 0.3;
+    b.cyl([fire[0] + Math.cos(a) * 0.12, 0.07, fire[2] + Math.sin(a) * 0.12], [0.07, 0.42, 0.07], MAT.WOOD, [0.1, 0.06, 0.03],
+      { R: basisY([Math.cos(a) * 0.9, 0.35, Math.sin(a) * 0.9]) });
+  }
+  b.cone([fire[0], 0.2, fire[2]], [0.2, 0.42, 0.2], MAT.EMIT, [1.0, 0.45, 0.1], { p1: [45, 0, 0, 0] });
+  b.cone([fire[0] + 0.04, 0.16, fire[2] - 0.03], [0.12, 0.3, 0.12], MAT.EMIT, [1.0, 0.7, 0.25], { p1: [90, 0, 0, 0] });
+  for (let i = 0; i < 6; i++) b.ball([fire[0] + (R() - 0.5) * 0.4, 0.03, fire[2] + (R() - 0.5) * 0.4], 0.03, MAT.EMIT, [1.0, 0.3, 0.05], { p1: [20, 0, 0, 0] });
+  b.light([fire[0], 0.3, fire[2]], [1.0, 0.5, 0.18], 14, { radius: 0.25 });
+
+  // Stump with a lantern, and a log to sit on
+  b.cyl([-1.5, 0.2, -1.4], [0.42, 0.4, 0.42], MAT.WOOD, [0.12, 0.08, 0.05], { p1: [0.3, 2, 0, 0] });
+  b.cyl([-1.5, 0.5, -1.4], [0.12, 0.2, 0.12], MAT.DIFFUSE, [0.8, 0.76, 0.66], { p1: [0.5, 0, 0, 0] });
+  b.ball([-1.5, 0.52, -1.4], [0.07, 0.11, 0.07], MAT.EMIT, [1.0, 0.7, 0.35], { p1: [60, 0, 0, 0] });
+  b.cyl([-1.5, 0.63, -1.4], [0.14, 0.02, 0.14], MAT.METAL, [0.15, 0.15, 0.15], { p1: [0.4, 0, 0, 0] });
+  b.light([-1.5, 0.55, -1.4], [1.0, 0.68, 0.33], 3.5, { radius: 0.12 });
+  b.cyl([0.55, 0.15, -1.95], [0.3, 1.5, 0.3], MAT.WOOD, [0.14, 0.09, 0.05], { R: basisY([1, 0, 0.08]), p1: [0.3, 2, 0, 0] });
+  b.cyl([0.0, 0.07, -1.95], [0.14, 0.14, 0.14], MAT.WOOD, [0.12, 0.08, 0.04], { p1: [0.3, 2, 0, 0] });
+
+  // A dark treeline behind the tent, then low rolling hills about a kilometre away (about 3° high), so the sky stays the subject
+  const pine = [0.012, 0.022, 0.012];
+  for (let i = 0; i < 110; i++) {
+    const x = -90 + R() * 180, z = 70 + R() * 80;
+    const h = 6 + R() * 7;
+    b.cone([x, h / 2 - 0.5, z], [h * 0.38, h, h * 0.38], MAT.FOLIAGE, pine, { p1: [0.3, 0, 0, 0] });
+  }
+
+  for (let i = 0; i < 16; i++) {
+    const x = -1100 + i * 150 + R() * 80, z = 950 + R() * 450, h = 22 + R() * 45;
+    b.ball([x, 0, z], [380 + R() * 360, h * 2, 260 + R() * 200], MAT.TERRAIN, [0.3, 0.3, 0.3]);
+  }
+
+  const subject = [tent[0], 0.75, tent[2] - 0.78];
+  return {
+    id: 'camp', name: 'Starlit campsite', ev100: -5.5,
+    blurb: 'A glowing tent, a small fire and a starry sky. Shows coma and astigmatism in the corners of fast wide lenses, high-ISO noise and long exposures. Click a star to focus at infinity.',
+    ko: { name: '별빛 캠핑장', blurb: '빛나는 텐트와 작은 모닥불, 별이 가득한 하늘. 밝은 광각 렌즈의 모서리 코마·비점수차, 고감도 노이즈, 장노출을 확인합니다. 별을 클릭하면 무한대에 초점이 맞습니다.' },
+    built: b.pack(), lights: b.lights, illuminant: [1.0, 0.97, 0.92],
+    sun: { dir: norm([-0.55, 0.07, 0.83]), color: [0.62, 0.72, 1.0], irradiance: 0.03, disc: 0, size: 0, shadow: false },
+    sky: { zenith: [0.012, 0.022, 0.06], horizon: [0.05, 0.05, 0.075], ground: [0.004, 0.005, 0.004], ambient: 0.8, clouds: 0, stars: 3.2 },
+    fog: { density: 0, color: [0, 0, 0] },
+    shadow: { center: [0, 0, 4], half: 12, depth: 40 },
+    camera: { subject, dir: norm([0.12, 0.1, -1]), frame: [0.0, -0.45], distance: 8, min: 1.6, max: 16 },
+    // A night scene needs far more light than the ISO 100 every other scene starts from.
+    defaults: { iso: 3200, support: 'tripod' },
+    maxSpeed: 0.3, sceneIndex: 4,
+  };
+}
+
+const BUILDERS = { garden, street, lake, bench, camp };
 export const SCENE_LIST = [
   { id: 'garden', name: 'Garden bench, golden hour', ko: { name: '정원 벤치, 골든아워' } },
   { id: 'street', name: 'City street at night', ko: { name: '밤의 도시 거리' } },
   { id: 'lake', name: 'Mountain lake, afternoon', ko: { name: '산정 호수, 오후' } },
   { id: 'bench', name: 'Studio test bench', ko: { name: '스튜디오 테스트 벤치' } },
+  { id: 'camp', name: 'Starlit campsite', ko: { name: '별빛 캠핑장' } },
 ];
 const cache = new Map();
 export function getScene(id) {
