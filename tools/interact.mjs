@@ -18,7 +18,9 @@ await new Promise((r) => server.listen(0, r));
 const browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 1500 } });
 const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+// Font hosts can be unreachable (offline, locked-down network): the page falls back to system fonts, so that is not an app error.
+const FONT_HOSTS = /^https:\/\/(cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com)\//;
+page.on('console', (m) => { if (m.type() === 'error' && !FONT_HOSTS.test(m.location().url || '')) errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(`http://localhost:${server.address().port}/?scene=garden&q=draft&frames=4&skip=present`);
 const ready = () => page.waitForFunction(() => document.body.dataset.state === 'ready', null, { timeout: 600000, polling: 500 });

@@ -84,7 +84,7 @@ function renderLabels() {
   fillSelect($('wb'), WHITE_BALANCE, state.wb);
   fillSelect($('style'), STYLES, state.style);
   $('scenes').innerHTML = SCENE_LIST.map((s) => `<button type="button" class="chip" data-scene="${s.id}" id="scene-${s.id}">${loc(s)}</button>`).join('');
-  $('hold').textContent = t(state.comparing ? 'compare.replace' : 'compare.hold');
+  syncCompareUI();
 }
 renderLabels();
 
@@ -213,6 +213,7 @@ function updateViews() {
   const vf = $('viewfinder');
   const aspect = `${W} / ${H}`;
   if (vf.style.aspectRatio !== aspect) vf.style.aspectRatio = aspect;
+  vf.style.setProperty('--ar', (W / H).toFixed(4));
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cssW = vf.clientWidth;
   const outW = Math.max(64, Math.min(q.cap, Math.round(cssW * dpr * q.scale)));
@@ -373,53 +374,81 @@ function renderUI(cam, ln, sc, r) {
   if (Math.abs(r.evOffset) > 0.4 && state.mode !== 'A') warn.push(['warn', t('warn.exposure', { ev: fmtEV(r.evOffset) })]);
   $('warnings').innerHTML = warn.map(([k, text]) => `<li class="chip-${k}">${text}</li>`).join('');
 
-  drawFocusScale(ln, r);
-  drawMeter(state.mode === 'M' ? r.evOffset : state.ec);
+  redrawScales();
+  document.querySelectorAll('input[type="range"]').forEach(syncRange);
   positionOverlay();
 }
 
+// Slider track is filled up to the thumb (read by the CSS as --fill).
+function syncRange(el) {
+  const min = +el.min || 0, max = +el.max || 100;
+  const f = max > min ? clamp((+el.value - min) / (max - min), 0, 1) : 0;
+  el.style.setProperty('--fill', `${(f * 100).toFixed(1)}%`);
+}
+function redrawScales() {
+  if (!lastUI) return;
+  const r = lastUI[3];
+  drawFocusScale(lastUI[1], r);
+  drawMeter(state.mode === 'M' ? r.evOffset : state.ec);
+}
+
+
 // --- Focus scale (lens barrel style, linear in 1/distance) ----------------------------------
+const FS_PAD = 22;
 function focusT(d, dmin) { return d === Infinity || d > 1e4 ? 1 : clamp(1 - dmin / d, 0, 1); }
 function focusFromT(t, dmin) { return t >= 0.999 ? 1e4 : dmin / (1 - t); }
 function drawFocusScale(ln, r) {
   const svg = $('focus-scale');
-  const W = svg.clientWidth || 600, Hh = 56;
+  const W = svg.clientWidth || 600, Hh = 58;
   svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
-  const pad = 14, w = W - pad * 2;
-  const x = (d) => pad + focusT(d, ln.minFocus) * w;
+  const w = W - FS_PAD * 2;
+  const x = (d) => FS_PAD + focusT(d, ln.minFocus) * w;
   const marks = [0.25, 0.3, 0.4, 0.5, 0.7, 1, 1.5, 2, 3, 5, 10, 20, Infinity].filter((d) => d >= ln.minFocus - 1e-6);
-  let s = `<line x1="${pad}" y1="30" x2="${pad + w}" y2="30" class="fs-axis"/>`;
-  const nearX = x(r.dof.near), farX = x(r.dof.far);
-  s += `<rect x="${nearX}" y="22" width="${Math.max(2, farX - nearX)}" height="16" rx="2" class="fs-dof"/>`;
-  const hx = x(r.dof.hyperfocal);
-  s += `<line x1="${hx}" y1="18" x2="${hx}" y2="42" class="fs-hyper"/><text x="${hx}" y="54" class="fs-hyper-t">H</text>`;
-  let lastX = -99;
-  for (const d of marks) {
-    const mx = x(d);
-    s += `<line x1="${mx}" y1="26" x2="${mx}" y2="34" class="fs-tick"/>`;
-    if (mx - lastX > 22) { s += `<text x="${mx}" y="14" class="fs-label">${d === Infinity ? '∞' : d < 1 ? d.toFixed(d < 0.5 ? 2 : 1).replace(/^0/, '') : d}</text>`; lastX = mx; }
+  // Labels are chosen by importance so that ∞ and the round numbers survive on narrow screens.
+  const order = [Infinity, 1, 2, 5, 0.5, 10, 3, 0.7, 1.5, 0.4, 0.3, 20, 0.25];
+  const labelled = [];
+  for (const d of order) {
+    if (marks.includes(d) && labelled.every((o) => Math.abs(x(o) - x(d)) > 25)) labelled.push(d);
   }
+  let s = `<rect x="${FS_PAD - 8}" y="19" width="${w + 16}" height="19" rx="6" class="fs-barrel"/>`;
+  const nearX = x(r.dof.near), farX = x(r.dof.far);
+  const dofW = Math.max(3, farX - nearX);
+  s += `<rect x="${nearX}" y="21" width="${dofW}" height="15" rx="3" class="fs-dof"/>`;
+  s += `<line x1="${nearX}" y1="21" x2="${nearX}" y2="36" class="fs-dof-edge"/><line x1="${nearX + dofW}" y1="21" x2="${nearX + dofW}" y2="36" class="fs-dof-edge"/>`;
+  const hx = x(r.dof.hyperfocal);
+  s += `<line x1="${hx}" y1="16" x2="${hx}" y2="40" class="fs-hyper"/><text x="${hx}" y="53" class="fs-hyper-t">H</text>`;
+  for (const d of marks) {
+    const mx = x(d), big = labelled.includes(d);
+    s += `<line x1="${mx}" y1="${big ? 22 : 24}" x2="${mx}" y2="${big ? 34 : 32}" class="fs-tick${big ? '' : ' minor'}"/>`;
+    if (big) s += `<text x="${mx}" y="12" class="fs-label">${d === Infinity ? '∞' : d}</text>`;
+  }
+  s += `<text x="${FS_PAD - 8}" y="53" class="fs-unit">m</text>`;
   svg.setAttribute('aria-valuetext', fmtDist(r.focusM));
   const fx = x(r.focusM);
-  s += `<path d="M${fx} 20 l-6 -9 h12 z" class="fs-pointer"/><line x1="${fx}" y1="20" x2="${fx}" y2="40" class="fs-pointer-line"/>`;
+  s += `<line x1="${fx}" y1="16" x2="${fx}" y2="40" class="fs-pointer-line"/><path d="M${fx} 39 l-6 10 h12 z" class="fs-pointer"/>`;
   svg.innerHTML = s;
 }
 function drawMeter(ev) {
   const svg = $('meter');
-  const W = 220, Hh = 34;
-  const pad = 10, w = W - pad * 2;
+  const W = svg.clientWidth || 270, Hh = 40;
+  const pad = 14, w = W - pad * 2;
   const x = (e) => pad + (clamp(e, -3, 3) + 3) / 6 * w;
-  let s = '';
+  // Pointer above the scale, tick marks below it, numbers last: nothing overlaps.
+  let s = `<line x1="${x(-3)}" y1="14" x2="${x(3)}" y2="14" class="m-axis"/>`;
+  const ex = x(ev);
+  s += `<rect x="${Math.min(x(0), ex)}" y="12" width="${Math.abs(ex - x(0)) || 1.5}" height="4" rx="1" class="m-bar"/>`;
   for (let e = -3; e <= 3.001; e += 1 / 3) {
     const major = Math.abs(e - Math.round(e)) < 1e-6;
-    s += `<line x1="${x(e)}" y1="${major ? 6 : 10}" x2="${x(e)}" y2="16" class="${major ? 'm-major' : 'm-minor'}"/>`;
-    if (major) s += `<text x="${x(e)}" y="30" class="m-label">${e === 0 ? '0' : (e > 0 ? '+' : '−') + Math.abs(Math.round(e))}</text>`;
+    s += `<line x1="${x(e)}" y1="15" x2="${x(e)}" y2="${major ? 24 : 20}" class="${major ? 'm-major' : 'm-minor'}"/>`;
+    if (major) {
+      const n = Math.round(e);
+      s += `<text x="${x(e)}" y="36" class="m-label${n === 0 ? ' zero' : ''}">${n === 0 ? '0' : (n > 0 ? '+' : '−') + Math.abs(n)}</text>`;
+    }
   }
-  const ex = x(ev);
-  s += `<rect x="${Math.min(x(0), ex)}" y="17" width="${Math.abs(ex - x(0)) || 1.5}" height="3" class="m-bar"/>`;
-  s += `<path d="M${ex} 21 l-4 6 h8 z" class="m-pointer"/>`;
+  s += `<path d="M${ex} 11 l-5 -9 h10 z" class="m-pointer"/>`;
   svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
   svg.innerHTML = s;
+  $('meter-val').textContent = `${fmtEV(ev)} EV`;
 }
 
 function positionOverlay() {
@@ -481,6 +510,7 @@ $('ec').addEventListener('input', (e) => { state.ec = +e.target.value; schedule(
 $('distance').addEventListener('input', (e) => { state.distance = +e.target.value; lastFEq = null; state.afTracksSubject = true; schedule(); });
 $('keep').addEventListener('change', (e) => { state.keepFraming = e.target.checked; schedule(); });
 $('refocus').addEventListener('click', () => { state.afTracksSubject = true; schedule(); });
+$('refocus-chip').addEventListener('click', () => { state.afTracksSubject = true; schedule(); });
 $('wb').addEventListener('change', (e) => { state.wb = e.target.value; schedule(); });
 $('style').addEventListener('change', (e) => { state.style = e.target.value; schedule(); });
 $('zebra').addEventListener('change', (e) => { state.zebra = e.target.checked; schedule(); });
@@ -492,7 +522,7 @@ $('grid').addEventListener('change', (e) => { state.grid = e.target.checked; sch
   let dragging = false;
   const set = (ev) => {
     const rect = svg.getBoundingClientRect();
-    const t = clamp((ev.clientX - rect.left - 14) / (rect.width - 28), 0, 1);
+    const t = clamp((ev.clientX - rect.left - FS_PAD) / (rect.width - FS_PAD * 2), 0, 1);
     state.focusM = focusFromT(t, lens().minFocus);
     state.afTracksSubject = false;
     schedule();
@@ -548,25 +578,30 @@ $('grid').addEventListener('change', (e) => { state.grid = e.target.checked; sch
 })();
 
 // A/B compare
+// The Compare group and the phone's shortcut chip over the picture show the same state.
+function syncCompareUI() {
+  $('hold').textContent = t(state.comparing ? 'compare.replace' : 'compare.hold');
+  $('clear-hold').hidden = !state.comparing;
+  $('hold-chip').textContent = t(state.comparing ? 'compare.stop' : 'chip.hold');
+}
 function holdA() {
   if (!renderer) return;
   renderer.capture();
   const cam = camera(), ln = lens();
   state.held = { cam: { name: cam.short }, lens: ln, N: shot.N, t: shot.t, iso: shot.iso, loupeKey: loupeKey() };
   state.comparing = true;
-  $('hold').textContent = t('compare.replace');
-  $('clear-hold').hidden = false;
+  syncCompareUI();
   updateViews();
   renderer.present();
 }
 function clearHold() {
   state.comparing = false; state.held = null;
-  $('hold').textContent = t('compare.hold');
-  $('clear-hold').hidden = true;
+  syncCompareUI();
   renderer?.clearCapture();
   if (renderer && shot) updateViews();
 }
 $('hold').addEventListener('click', holdA);
+$('hold-chip').addEventListener('click', () => (state.comparing ? clearHold() : holdA()));
 // Language: only the text changes, so the picture is not re-rendered.
 document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
   if (b.dataset.lang === getLang()) return;
@@ -578,6 +613,38 @@ document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('clic
 $('clear-hold').addEventListener('click', clearHold);
 
 new ResizeObserver(() => { if (shot) { if (state.comparing) clearHold(); updateViews(); renderer?.resetAll(); } }).observe($('viewfinder'));
+new ResizeObserver(redrawScales).observe($('focus-scale'));
+new ResizeObserver(redrawScales).observe($('meter'));
+
+// Tabs (phones and tablets): one panel at a time scrolls beneath the pinned picture. Unselected panels
+// are collapsed by CSS rather than hidden, so the loupe keeps its width. On wide screens every panel shows.
+(() => {
+  const app = document.querySelector('.app');
+  const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+  const panels = [...document.querySelectorAll('[data-panel]')];
+  const dock = document.querySelector('.dock');
+  const KEY = 'lvs-tab';
+  const valid = (n) => tabs.some((b) => b.dataset.tab === n);
+  const select = (name, { scroll = true, focus = false } = {}) => {
+    app.dataset.tab = name;
+    tabs.forEach((b) => { const on = b.dataset.tab === name; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); });
+    panels.forEach((p) => p.classList.toggle('is-off', p.dataset.panel !== name));
+    try { localStorage.setItem(KEY, name); } catch { /* storage blocked */ }
+    // Start the new panel right under the pinned area instead of wherever the last one was scrolled to.
+    if (scroll && dock && getComputedStyle(dock).position === 'sticky' && window.scrollY > dock.offsetTop) window.scrollTo(0, dock.offsetTop);
+  };
+  tabs.forEach((b, i) => {
+    b.addEventListener('click', () => select(b.dataset.tab));
+    b.addEventListener('keydown', (e) => {
+      const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (d) { e.preventDefault(); select(tabs[(i + d + tabs.length) % tabs.length].dataset.tab, { focus: true }); }
+    });
+  });
+  let first = params.get('tab');
+  if (!valid(first)) { try { first = localStorage.getItem(KEY); } catch { first = null; } }
+  select(valid(first) ? first : 'exposure', { scroll: false });
+})();
+
 
 // --- Boot ------------------------------------------------------------------------------------------
 async function boot() {

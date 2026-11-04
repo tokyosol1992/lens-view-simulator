@@ -69,10 +69,12 @@ for (const [name, viewport] of [['desktop', { width: 1280, height: 1500 }], ['ph
   check(`${name}: choice persists after reload`, (await page.evaluate(() => document.documentElement.lang)) === 'en');
   await page.locator('#lang-ko').click();
   await page.waitForTimeout(200);
-  await page.click('#hold');
+  // On phones the Compare group is hidden and the chip over the picture starts the comparison.
+  await page.click(name === 'phone' ? '#hold-chip' : '#hold');
   await page.waitForTimeout(300);
   const holdText = await page.evaluate(() => [document.getElementById('hold').textContent, document.getElementById('clear-hold').textContent]);
   check(`${name}: compare buttons translated`, holdText.every(hangul), holdText.join(' / '));
+  if (name === 'phone') check(`${name}: shortcut chip translated`, hangul(await page.locator('#hold-chip').textContent()), await page.locator('#hold-chip').textContent());
   check(`${name}: no page errors`, errors.length === 0, errors.join(' | '));
   await context.close();
 }

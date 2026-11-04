@@ -4,6 +4,10 @@ A web page for camera and lens customers. Pick a camera body, a lens and a sampl
 
 The interface is available in English and Korean. The **EN / 한국어** switch sits in the top bar on phones and desktops. It defaults to the browser language, remembers the choice in the browser, and can be set with `?lang=ko` or `?lang=en`. Switching language changes only the text, so the picture is not re-rendered.
 
+On wide screens the picture, focus scale, loupe and readouts are on the left and the settings are in a column on the right. On phones and narrow windows the picture, the focus scale and a tab bar stay pinned to the top, and the tabs (**Gear, Location, Exposure, Picture, Results**) choose which panel scrolls beneath them, so every change can be seen as it is made. A **Hold as A** chip over the picture starts a comparison without leaving the settings.
+
+The look follows a flat, one-accent style: surfaces step in lightness instead of using borders, blue is the only accent, controls are large, and the font is [Pretendard](https://github.com/orioncactus/pretendard) (SIL OFL), loaded from jsDelivr with Noto Sans KR and the system Korean font as fallbacks. Dark and light follow the system setting.
+
 The page is static: no build step and no dependencies.
 
 ```sh
@@ -67,10 +71,11 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `tools/check-optics.mjs` | `node tools/check-optics.mjs`: optics maths against textbook values |
 | `tools/check-wgsl.mjs` | Compiles every shader in headless Chromium and lists errors |
 | `tools/i18n-check.mjs` | Checks the language switch on desktop and phone widths: every label translated, no overflow, choice persists |
+| `tools/layout-check.mjs` | Checks the responsive layout without a GPU, at phone, tablet and desktop widths in both languages: no overflow, header not overlapping, picture and tabs pinned on narrow screens, one panel per tab, loupe keeps its size. `FONT_DIR=<pretendard folder>` measures with the real font offline |
 | `tools/interact.mjs` | Clicks to focus, holds A, refocuses and switches lens in headless Chromium |
 | `tools/shoot.mjs` | Renders setups headlessly and saves screenshots, e.g. `node tools/shoot.mjs out "scene=street&lens=p85&q=draft"` |
 
-A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `zoom` (loupe 1, 2 or 4), `wb`, `style`, `lang` (`en`, `ko`) and `q` (`draft`, `standard`, `high`).
+A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `zoom` (loupe 1, 2 or 4), `wb`, `style`, `lang` (`en`, `ko`), `tab` (`gear`, `location`, `exposure`, `picture`, `results`: the panel shown on narrow screens) and `q` (`draft`, `standard`, `high`).
 
 ## Adding products
 
