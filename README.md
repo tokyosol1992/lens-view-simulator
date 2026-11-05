@@ -4,7 +4,7 @@ A web page for camera and lens customers. Pick a camera body, a lens and a sampl
 
 The interface is available in English and Korean. The **EN / 한국어** switch sits in the top bar on phones and desktops. It defaults to the browser language, remembers the choice in the browser, and can be set with `?lang=ko` or `?lang=en`. Switching language changes only the text, so the picture is not re-rendered.
 
-**Using it.** *Quick starts* set up a comparison for one effect (portrait blur, night noise, landscape sharpness, telephoto compression, resolution and moiré, phone vs. big sensor) and say what to look at. *Hold this view as A* sits right under the picture; change the camera, lens or any setting, then drag the divider. The current setup is kept in the address bar, so reloading reopens it; **Copy link** gives a clean link to share and **Reset** returns to the defaults. On wide screens the settings column stays in view and scrolls on its own. On a phone the picture is pinned at the top while the gear and dials scroll underneath, and the loupe and results come last.
+**Using it.** *Quick starts* set up a comparison for one effect (portrait blur, night noise, landscape sharpness, telephoto compression, resolution and moiré, 1-inch vs. big sensor, medium format look) and say what to look at. *Hold this view as A* sits right under the picture; change the camera, lens or any setting, then drag the divider. The current setup is kept in the address bar, so reloading reopens it; **Copy link** gives a clean link to share and **Reset** returns to the defaults. On wide screens the settings column stays in view and scrolls on its own. On a phone the picture is pinned at the top while the gear and dials scroll underneath, and the loupe and results come last.
 
 The page is static: no build step and no dependencies.
 
@@ -60,6 +60,7 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | --- | --- |
 | `index.html` | Page, layout and styles |
 | `src/catalog.js` | Camera bodies and lenses (with picker groups), dial scales, white balance, picture styles |
+| `src/lenses-brands.js` | Brand lens rows, lens classes, native formats and the generator for optical character |
 | `src/presets.js` | Quick starts: a setup link plus what to look at, in English and Korean |
 | `src/optics.js` | Camera maths: FOV, DOF, hyperfocal, exposure, diffraction, noise, shake |
 | `src/scenes.js` | The four locations |
@@ -78,7 +79,7 @@ A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids 
 
 ## Adding products
 
-The catalog has 16 body classes (medium format, full frame, APS-C, Micro Four Thirds, cinema, compact and phone) and 26 lens classes, grouped in the pickers. Lenses that do not cover the chosen sensor are marked *dark corners* in the list. Add an entry to `CAMERAS` or `LENSES` in `src/catalog.js`; the comments there describe each field. Give it a `group` (see `CAMERA_GROUPS` and `LENS_GROUPS`) and a `ko: { name, note }` field for the Korean interface; without one, the English text is shown. `node tools/check-optics.mjs` checks ids, groups, Korean text and that every body has a lens that covers it. The current entries describe product *classes* (for example "Full frame 24 MP" or "85mm f/1.4 portrait") with representative values. They are not measurements of specific commercial models. For a real catalogue, fill in the manufacturer's sensor size, pixel count, base ISO and blade count. Optical character values (distortion, CA, softness, flare) are best taken from lab measurements.
+The catalog has 15 **sensor-class bodies** (1-inch, Micro Four Thirds, APS-C, full frame, medium format 44×33 and 645; no commercial model names) and 127 lenses: 100 **mirrorless brand lenses** (Sony E, Nikon Z, Canon RF, Fujifilm X and GF, Panasonic L-mount and MFT, OM System, Sigma, Tamron, Viltrox) plus 27 generic classes. The lens picker has brand, view (full-frame equivalent) and *covers this camera* filters; changing a filter jumps to the lens with the closest equivalent view. Lenses that do not cover the chosen sensor are marked *dark corners*. Brand lens rows live in `src/lenses-brands.js` (brand, mount, format, focal length, maximum aperture, closest focus, blades); their optical character is generated from the lens class and is **not measured**. Rows flagged `est` have a closest-focus or blade value still to be checked against the maker's data. See `HANDOFF.md` for open work. Bodies are added in `src/catalog.js` (the comments describe each field) with a `group` and a `ko: { name }`. `node tools/check-optics.mjs` checks ids, groups, Korean text, and that every body has a lens that covers it. Optical character values (distortion, CA, softness, flare) are best taken from lab measurements.
 
 ## Limits
 

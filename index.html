@@ -210,7 +210,8 @@ input[type="range"]:disabled { opacity: 0.45; }
 .actions .grow { flex: 1; }
 .actions .btn { min-height: 36px; }
 .actions .hint { flex-basis: 100%; margin: 0; }
-.chips-wide { grid-template-columns: 1fr 1fr; }
+.chips.three { grid-template-columns: repeat(3, 1fr); }
+.chips.three .chip { padding: 6px 6px; font-size: 12px; }
 .spec-line { margin: -4px 0 0; }
 .spec-line.bad { color: var(--warn); }
 .focus-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -342,9 +343,13 @@ input[type="range"]:disabled { opacity: 0.45; }
       <h2 data-i18n="group.gear">Gear</h2>
       <label class="field"><span class="field-label" data-i18n="field.camera">Camera body</span><select id="camera"></select></label>
       <p class="note" id="cam-spec"></p>
-      <label class="field"><span class="field-label" data-i18n="field.lens">Lens</span><select id="lens"></select></label>
+      <div class="field"><span class="field-label" data-i18n="field.brand">Brand</span><select id="brand"></select></div>
+      <div class="field"><span class="field-label" data-i18n="field.view">View (full-frame equivalent)</span><div class="chips three" id="views"></div></div>
+      <label class="check"><input type="checkbox" id="fits"> <span data-i18n="field.fits">Only lenses that cover this camera</span></label>
+      <label class="field"><span class="field-label"><span data-i18n="field.lens">Lens</span> <output id="lens-count"></output></span><select id="lens"></select></label>
       <p class="note spec-line" id="lens-spec"></p>
       <p class="note" id="lens-note"></p>
+      <p class="note" id="lens-est"></p>
       <label class="field" id="focal-row"><span class="field-label"><span data-i18n="field.focal">Focal length</span> <output id="focal-val"></output></span><input type="range" id="focal" step="1"></label>
     </section>
 

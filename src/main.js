@@ -1,4 +1,4 @@
-import { CAMERAS, LENSES, CAMERA_GROUPS, LENS_GROUPS, APERTURES, SHUTTERS, ISOS, WHITE_BALANCE, STYLES } from './catalog.js';
+import { CAMERAS, LENSES, CAMERA_GROUPS, LENS_GROUPS, BRANDS, FORMATS, APERTURES, SHUTTERS, ISOS, WHITE_BALANCE, STYLES } from './catalog.js';
 import { PRESETS } from './presets.js';
 import * as O from './optics.js';
 import { getScene, SCENE_LIST } from './scenes.js';
@@ -87,12 +87,65 @@ function fillSelect(el, items, value, groups, label = loc) {
     : items.map(opt).join('');
   el.value = value;
 }
-// Lens names carry a marker when the lens does not cover the chosen sensor.
-const lensLabel = (l) => (O.lensCovers(l, camera()) ? loc(l) : `${loc(l)} · ${t('lens.optVignette')}`);
-function fillLenses() { fillSelect($('lens'), LENSES, state.lensId, LENS_GROUPS, lensLabel); }
+// --- Lens browser: brand, view (full-frame equivalent) and sensor-fit filters ----------------
+const VIEWS = [
+  { id: 'all', min: 0, max: Infinity },
+  { id: 'uw', min: 0, max: 23.99 },
+  { id: 'wide', min: 24, max: 39.99 },
+  { id: 'std', min: 40, max: 69.99 },
+  { id: 'portrait', min: 70, max: 135.99 },
+  { id: 'tele', min: 136, max: Infinity },
+];
+const ui = { brand: 'all', view: 'all', fits: false };
+const eqRange = (l) => { const c = FORMATS[l.format].crop; return [l.focal[0] * c, l.focal[1] * c]; };
+function lensMatches(l) {
+  const v = VIEWS.find((x) => x.id === ui.view), [a, b] = eqRange(l);
+  return (ui.brand === 'all' || l.brand === ui.brand) && (!ui.fits || O.lensCovers(l, camera())) && b >= v.min && a <= v.max;
+}
+// Lens names carry their full-frame equivalent and a marker when the lens does not cover the sensor.
+function lensLabel(l) {
+  const [a, b] = eqRange(l), c = FORMATS[l.format].crop;
+  const eq = c === 1 ? '' : ` · ${t('lens.eq', { eq: a === b ? Math.round(a) : `${Math.round(a)}–${Math.round(b)}` })}`;
+  return `${loc(l)}${eq}${O.lensCovers(l, camera()) ? '' : ` · ${t('lens.optVignette')}`}`;
+}
+function fillLenses() {
+  const list = LENSES.filter(lensMatches);
+  const shown = list.length ? list : [lens()];
+  fillSelect($('lens'), shown, state.lensId, ui.brand === 'all' ? LENS_GROUPS : null, lensLabel);
+  $('lens-count').textContent = list.length ? t(list.length === 1 ? 'lens.count1' : 'lens.count', { n: list.length }) : t('lens.none');
+}
+// Move to the lens in the filtered list whose view is closest to the current framing.
+function nearestLens() {
+  const list = LENSES.filter(lensMatches);
+  if (!list.length || list.some((l) => l.id === state.lensId)) return null;
+  const now = state.focal * FORMATS[lens().format].crop;
+  const dist = (l) => { const [a, b] = eqRange(l); const e = Math.min(b, Math.max(a, now)); return Math.abs(Math.log(e / now)); };
+  return list.reduce((best, l) => (dist(l) < dist(best) ? l : best));
+}
+function chooseLens(id) {
+  const prev = lens();
+  const eqNow = state.focal * FORMATS[prev.format].crop;
+  state.lensId = id; activePreset = null;
+  const ln = lens();
+  // Keep the same equivalent view when switching between lenses.
+  const want = eqNow / FORMATS[ln.format].crop;
+  state.focal = ln.focal[0] === ln.focal[1] ? ln.focal[0] : clamp(want, ln.focal[0], ln.focal[1]);
+  state.N = O.maxApertureAt(ln, state.focal);
+  $('lens').dataset.cam = '';
+  schedule();
+}
+function fillBrandControls() {
+  const count = (id) => LENSES.filter((l) => l.brand === id).length;
+  $('brand').innerHTML = `<option value="all">${t('brand.all')} (${LENSES.length})</option>` + BRANDS.map((b) => `<option value="${b.id}">${loc(b)} (${count(b.id)})</option>`).join('');
+  $('brand').value = ui.brand;
+  $('views').innerHTML = VIEWS.map((v) => `<button type="button" class="chip" data-view="${v.id}" aria-pressed="${ui.view === v.id}">${t('view.' + v.id)}</button>`).join('');
+  $('fits').checked = ui.fits;
+}
+
 function renderLabels() {
   applyStatic();
   fillSelect($('camera'), CAMERAS, state.cameraId, CAMERA_GROUPS);
+  fillBrandControls();
   fillLenses();
   $('presets').innerHTML = PRESETS.map((p) => `<button type="button" class="chip" data-preset="${p.id}" id="preset-${p.id}">${loc(p)}</button>`).join('');
   fillSelect($('wb'), WHITE_BALANCE, state.wb);
@@ -307,6 +360,9 @@ function renderUI(cam, ln, sc, r) {
   // Selections
   $('camera').value = cam.id;
   if ($('lens').dataset.cam !== cam.id + getLang()) { fillLenses(); $('lens').dataset.cam = cam.id + getLang(); }
+  if (!LENSES.some((l) => l.id === ln.id && lensMatches(l)) && (ui.brand !== 'all' || ui.view !== 'all' || ui.fits)) {
+    Object.assign(ui, { brand: 'all', view: 'all', fits: false }); fillBrandControls(); fillLenses();
+  }
   $('lens').value = ln.id;
   document.querySelectorAll('[data-scene]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scene === sc.id)));
   document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
@@ -321,7 +377,10 @@ function renderUI(cam, ln, sc, r) {
       ? t('lens.specFixed', { f: ln.focal[0], n: fmtN(ln.maxN[0]), m })
       : t('lens.specZoom', { f1: ln.focal[0], f2: ln.focal[1], n1: fmtN(ln.maxN[0]), n2: fmtN(ln.maxN[1]), m });
     const el = $('lens-spec');
-    el.textContent = `${spec} · ${t('lens.blades', { b: ln.blades })} · ${t(covers ? 'lens.covers' : 'lens.vignettes')}`;
+    const fmtName = loc(FORMATS[ln.format], 'label');
+    const meta = ln.brand === 'generic' ? t('lens.metaGeneric', { fmt: fmtName }) : t('lens.meta', { brand: loc(BRANDS.find((x) => x.id === ln.brand)), mount: ln.mount, fmt: fmtName });
+    el.textContent = `${meta} · ${spec} · ${t('lens.blades', { b: ln.blades })} · ${t(covers ? 'lens.covers' : 'lens.vignettes')}`;
+    $('lens-est').textContent = t(ln.est ? 'lens.est' : 'lens.noteClass');
     el.classList.toggle('bad', !covers);
   }
   document.querySelectorAll('[data-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === activePreset)));
@@ -556,14 +615,20 @@ $('presets').addEventListener('click', (e) => {
 });
 $('copy-link').addEventListener('click', copyLink);
 $('reset').addEventListener('click', () => { applySetup(''); updateLook(); });
-$('lens').addEventListener('change', (e) => {
-  const prev = lens();
-  state.lensId = e.target.value;
-  activePreset = null;
-  const ln = lens();
-  if (ln.focal[0] !== prev.focal[0] || ln.focal[1] !== prev.focal[1]) state.focal = ln.focal[0] === ln.focal[1] ? ln.focal[0] : clamp(state.focal, ln.focal[0], ln.focal[1]);
-  state.N = O.maxApertureAt(ln, state.focal);
-  schedule();
+$('lens').addEventListener('change', (e) => chooseLens(e.target.value));
+function onFilter() {
+  const next = nearestLens();
+  if (next) chooseLens(next.id); else { fillLenses(); schedule(); }
+  fillLenses();
+}
+$('brand').addEventListener('change', (e) => { ui.brand = e.target.value; onFilter(); });
+$('fits').addEventListener('change', (e) => { ui.fits = e.target.checked; onFilter(); });
+$('views').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-view]');
+  if (!b) return;
+  ui.view = b.dataset.view;
+  document.querySelectorAll('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === ui.view)));
+  onFilter();
 });
 $('focal').addEventListener('input', (e) => { state.focal = +e.target.value; schedule(); });
 $('scenes').addEventListener('click', (e) => {
