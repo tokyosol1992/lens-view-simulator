@@ -1,8 +1,13 @@
 // Product catalog and dial scales.
 //
-// Bodies and lenses are representative of current product classes, not specific
-// commercial models. Replace or extend these entries with a real catalog; every
-// field is consumed by src/optics.js and the GPU pipeline.
+// The first entries of each list are representative product *classes* (typical values, not a
+// specific commercial model). Entries marked kind: 'product' at the end of each list are real
+// products: the figures a maker publishes (sensor size, pixel count, ISO range, stabilisation,
+// focal length, aperture range, blade count, closest focus) were checked against maker or retailer
+// spec listings on 2026-11-04. Makers do not publish distortion, aberration, softness, flare or
+// sensor noise, so those fields are copied from the nearest class (basedOn) and are estimates, not
+// measurements. Replace them with lab measurements when you have them. Every field is consumed by
+// src/optics.js and the GPU pipeline.
 
 // Each entry may carry `ko` names and notes for the Korean interface.
 
@@ -74,6 +79,42 @@ export const CAMERAS = [
     fwcDensity: 1500, readNoise: 1.6, cfa: 'bayer', aa: false, stabilization: 3,
   },
 ];
+
+// Real products -----------------------------------------------------------------
+// Published by the maker: sensor, pixels, baseISO, maxISO (native range), stabilization (the body's
+// own figure; some makers quote more with particular lenses). Copied from the class named in
+// `basedOn`, so estimates: fwcDensity, readNoise, cfa and aa unless overridden below.
+const cameraFrom = (base, spec) => ({ ...CAMERAS.find((c) => c.id === base), kind: 'product', basedOn: base, ...spec });
+CAMERAS.push(
+  cameraFrom('ff24', {
+    id: 'a7m4', name: 'Sony α7 IV', short: 'α7 IV', ko: { name: '소니 α7 IV' },
+    sensor: [35.9, 23.9], pixels: [7008, 4672], baseISO: 100, maxISO: 51200, stabilization: 5.5,
+  }),
+  // Canon quotes up to 8 stops with certain RF lenses and at least 6 with the others.
+  cameraFrom('ff45', {
+    id: 'r5', name: 'Canon EOS R5', short: 'EOS R5', ko: { name: '캐논 EOS R5' },
+    sensor: [36.0, 24.0], pixels: [8192, 5464], baseISO: 100, maxISO: 51200, stabilization: 6, aa: true,
+  }),
+  // Nikon: up to 6.0 stops (Synchro VR with certain lenses). No optical low-pass filter.
+  cameraFrom('ff45', {
+    id: 'z8', name: 'Nikon Z8', short: 'Z8', ko: { name: '니콘 Z8' },
+    sensor: [35.9, 23.9], pixels: [8256, 5504], baseISO: 64, maxISO: 25600, stabilization: 6, aa: false,
+  }),
+  // Image size follows from the 20.4 MP effective count at 4:3. Body-only stabilisation 7 stops (8 with some lenses).
+  cameraFrom('m43', {
+    id: 'om1', name: 'OM System OM-1', short: 'OM-1', ko: { name: 'OM 시스템 OM-1' },
+    sensor: [17.3, 13.0], pixels: [5184, 3888], baseISO: 200, maxISO: 25600, stabilization: 7, aa: false,
+  }),
+  cameraFrom('apsc40', {
+    id: 'xt5', name: 'Fujifilm X-T5', short: 'X-T5', ko: { name: '후지필름 X-T5' },
+    sensor: [23.5, 15.6], pixels: [7728, 5152], baseISO: 125, maxISO: 12800, stabilization: 7,
+  }),
+  // Stabilisation and ISO range are from retailer spec listings; the maker's own page was not readable.
+  cameraFrom('mf102', {
+    id: 'gfx2', name: 'Fujifilm GFX100 II', short: 'GFX100 II', ko: { name: '후지필름 GFX100 II' },
+    sensor: [43.8, 32.9], pixels: [11648, 8736], baseISO: 80, maxISO: 12800, stabilization: 8,
+  }),
+);
 
 // Lenses ----------------------------------------------------------------------
 // focal: [wide, tele] mm (equal for primes); maxN: [at wide, at tele].
@@ -218,6 +259,56 @@ export const LENSES = [
     note: 'Made for APS-C. On a larger sensor the image circle leaves dark corners.',
   },
 ];
+
+// Real products -----------------------------------------------------------------
+// Published by the maker: focal, maxN, minN, blades (roundness 0.8–1.0 where the maker calls the
+// diaphragm rounded or circular), minFocus, transmission where a T-stop is quoted, and the format
+// the lens covers (imageCircle). Everything else is copied from the class in `basedOn` (estimates).
+const lensFrom = (base, spec) => ({ ...LENSES.find((l) => l.id === base), kind: 'product', basedOn: base, ...spec });
+LENSES.push(
+  lensFrom('n50p', {
+    id: 'rf5012', name: 'Canon RF 50mm F1.2 L USM', ko: { name: '캐논 RF 50mm F1.2 L USM', note: '10매 조리개, 최단 초점 0.4m, f/1.2–16.' },
+    maxN: [1.2, 1.2], minN: 16, blades: 10, minFocus: 0.4, note: '10 blades, closest focus 0.4 m, f/1.2–16.',
+  }),
+  lensFrom('s35', {
+    id: 'sig3514', name: 'Sigma 35mm F1.4 DG DN Art', ko: { name: '시그마 35mm F1.4 DG DN Art', note: '11매 원형 조리개, 최단 초점 0.3m, f/1.4–16.' },
+    focal: [35, 35], maxN: [1.4, 1.4], minN: 16, blades: 11, roundness: 0.85, minFocus: 0.3, note: '11 rounded blades, closest focus 0.3 m, f/1.4–16.',
+  }),
+  lensFrom('w24', {
+    id: 'sel24gm', name: 'Sony FE 24mm F1.4 GM', ko: { name: '소니 FE 24mm F1.4 GM', note: '11매 원형 조리개, 최단 초점 0.24m, f/1.4–16.' },
+    maxN: [1.4, 1.4], minN: 16, blades: 11, roundness: 1.0, minFocus: 0.24, note: '11 circular blades, closest focus 0.24 m, f/1.4–16.',
+  }),
+  lensFrom('uw14', {
+    id: 'sel14gm', name: 'Sony FE 14mm F1.8 GM', ko: { name: '소니 FE 14mm F1.8 GM', note: '9매 원형 조리개, 최단 초점 0.25m, f/1.8–16.' },
+    maxN: [1.8, 1.8], minN: 16, blades: 9, roundness: 0.8, minFocus: 0.25, note: '9 rounded blades, closest focus 0.25 m, f/1.8–16.',
+  }),
+  lensFrom('n50p', {
+    id: 'z5018s', name: 'Nikon NIKKOR Z 50mm f/1.8 S', ko: { name: '니콘 NIKKOR Z 50mm f/1.8 S', note: '9매 원형 조리개, 최단 초점 0.4m, f/1.8–16.' },
+    maxN: [1.8, 1.8], minN: 16, blades: 9, roundness: 0.8, minFocus: 0.4, note: '9 rounded blades, closest focus 0.4 m, f/1.8–16.',
+  }),
+  // The STF's apodization filter makes it f/2.8 but T5.6: two stops of light lost.
+  lensFrom('a90', {
+    id: 'sel100stf', name: 'Sony FE 100mm F2.8 STF GM OSS', ko: { name: '소니 FE 100mm F2.8 STF GM OSS', note: '11매 원형 조리개, 아포다이제이션 필터로 f/2.8이 T5.6, 최단 초점 0.57m(제한 스위치 근거리 위치).' },
+    focal: [100, 100], maxN: [2.8, 2.8], minN: 20, blades: 11, roundness: 1.0, minFocus: 0.57, transmission: 2.0,
+    note: '11 circular blades; apodization makes f/2.8 behave as T5.6. Closest focus 0.57 m (limiter set to near).',
+  }),
+  lensFrom('m100', {
+    id: 'sel90m', name: 'Sony FE 90mm F2.8 Macro G OSS', ko: { name: '소니 FE 90mm F2.8 Macro G OSS', note: '9매 원형 조리개, 1:1 매크로, 최단 초점 0.28m, f/2.8–22.' },
+    focal: [90, 90], maxN: [2.8, 2.8], minN: 22, blades: 9, roundness: 0.8, minFocus: 0.28, note: '9 rounded blades, 1:1 macro, closest focus 0.28 m, f/2.8–22.',
+  }),
+  // APS-C lens: the image circle only just covers the X-T5's sensor.
+  lensFrom('w24', {
+    id: 'xf2314', name: 'Fujifilm XF 23mm F1.4 R LM WR', ko: { name: '후지필름 XF 23mm F1.4 R LM WR', note: 'APS-C용(35mm 환산 약 35mm), 9매 원형 조리개, 최단 초점 0.19m, f/1.4–16.' },
+    focal: [23, 23], maxN: [1.4, 1.4], minN: 16, blades: 9, roundness: 0.8, minFocus: 0.19, imageCircle: 28.4,
+    note: 'Made for APS-C (about 35 mm equivalent), 9 rounded blades, closest focus 0.19 m, f/1.4–16.',
+  }),
+  // Medium-format lens: image circle covers the 43.8 × 32.9 mm sensor (diagonal 54.8 mm).
+  lensFrom('p85', {
+    id: 'gf1102', name: 'Fujifilm GF 110mm F2 R LM WR', ko: { name: '후지필름 GF 110mm F2 R LM WR', note: '중형용(35mm 환산 약 87mm), 9매 원형 조리개, 최단 초점 0.9m, f/2–22.' },
+    focal: [110, 110], maxN: [2.0, 2.0], minN: 22, blades: 9, roundness: 0.8, minFocus: 0.9, imageCircle: 55,
+    note: 'Made for medium format (about 87 mm equivalent), 9 rounded blades, closest focus 0.9 m, f/2–22.',
+  }),
+);
 
 // Dial scales (third stops) -------------------------------------------------------
 export const APERTURES = [1.0, 1.1, 1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.5, 2.8, 3.2, 3.5, 4, 4.5, 5, 5.6,

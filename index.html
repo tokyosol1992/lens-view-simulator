@@ -6,274 +6,379 @@
 <title>Lens View Simulator</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Pick a camera, a lens and a location and see the photograph it would make: framing, focus, bokeh, flare, distortion, diffraction and sensor noise, rendered live with WebGPU.">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: a camera back. Large viewfinder on the left, a lens-barrel focus scale under it,
-   the 100% loupe and spec readouts below; dials and choices in a right-hand column. */
+/* Design: flat surfaces stepped by lightness (no borders), one blue accent, large radii, Pretendard.
+   Layout: a camera back. Wide screens: viewfinder, focus scale and loupe/readouts on the left,
+   settings in a right-hand column. Narrow screens: the viewfinder, focus scale and a tab bar are pinned
+   to the top; the tabs (Gear, Location, Exposure, Picture, Results) switch what scrolls beneath them. */
 :root {
   color-scheme: dark;
-  --bg: #101214;
-  --panel: #171a1d;
-  --panel-2: #1f2327;
-  --line: #2c3136;
-  --fg: #ebe8e2;
-  --muted: #9ba1a7;
-  --accent: #f0b43c;       /* depth-of-field amber, as engraved on lens barrels */
-  --accent-ink: #1b1404;
-  --stage: #0a0b0c;        /* neutral surround for judging pictures */
-  --stage-fg: #e9e6df;
-  --ok: #5fca8e;
-  --warn: #f0954f;
-  --bad: #ff6272;
-  --info: #7cb8ff;
-  --font-display: "Archivo", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  --font-body: "Archivo", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --bg: #0F1115;           /* page */
+  --s1: #181B21;           /* card */
+  --s2: #21252C;           /* control face, track */
+  --s3: #2C313A;           /* raised, pressed */
+  --hover: rgba(255, 255, 255, 0.06);
+  --tx1: #F4F5F7; --tx2: #B4BAC3; --tx3: #8B929D; --tx4: #5E6570;
+  --blue: #1E6BF1;         /* filled buttons, slider fill (white text reads at 4.7:1) */
+  --blue-text: #5AA2FF;    /* values and text on dark surfaces */
+  --blue-tint: rgba(71, 149, 255, 0.16);
+  --seg-on: #3A404B; --seg-shadow: none; --thumb-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  --ok: #3DD68C; --warn: #FFAA33; --bad: #FF6B77; --info: #5AA2FF;
+  --stage: #07080A; --stage-fg: #FFFFFF;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
+  --font: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
   --auto-label: " auto";
-  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --radius: 6px;
+  --gx: max(16px, env(safe-area-inset-left, 0px));
+  --gxr: max(16px, env(safe-area-inset-right, 0px));
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bg: #eae8e3; --panel: #f6f5f2; --panel-2: #efede8; --line: #d3d0c8;
-    --fg: #17191b; --muted: #5d6268; --accent: #a86e00; --accent-ink: #fff8ea;
-    --stage: #0d0e0f; --stage-fg: #ece9e2;
-    --ok: #1f8a52; --warn: #b5541a; --bad: #c22c3d; --info: #2565b5;
+    --bg: #F2F4F6; --s1: #FFFFFF; --s2: #F2F4F6; --s3: #E5E8EB; --hover: rgba(0, 0, 0, 0.05);
+    --tx1: #191F28; --tx2: #4E5968; --tx3: #6B7684; --tx4: #B0B8C1;
+    --blue: #0064FF; --blue-text: #0057E0; --blue-tint: rgba(0, 100, 255, 0.1);
+    --seg-on: #FFFFFF; --seg-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); --thumb-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+    --ok: #07935A; --warn: #C96A00; --bad: #E5384A; --info: #0057E0;
+    --stage: #0D0E0F;
   }
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #eae8e3; --panel: #f6f5f2; --panel-2: #efede8; --line: #d3d0c8;
-  --fg: #17191b; --muted: #5d6268; --accent: #a86e00; --accent-ink: #fff8ea;
-  --stage: #0d0e0f; --stage-fg: #ece9e2;
-  --ok: #1f8a52; --warn: #b5541a; --bad: #c22c3d; --info: #2565b5;
+  --bg: #F2F4F6; --s1: #FFFFFF; --s2: #F2F4F6; --s3: #E5E8EB; --hover: rgba(0, 0, 0, 0.05);
+  --tx1: #191F28; --tx2: #4E5968; --tx3: #6B7684; --tx4: #B0B8C1;
+  --blue: #0064FF; --blue-text: #0057E0; --blue-tint: rgba(0, 100, 255, 0.1);
+  --seg-on: #FFFFFF; --seg-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); --thumb-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  --ok: #07935A; --warn: #C96A00; --bad: #E5384A; --info: #0057E0;
+  --stage: #0D0E0F;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
-  background: var(--bg); color: var(--fg);
-  font-family: var(--font-body); font-size: 14px; line-height: 1.45;
-  font-variation-settings: "wdth" 100;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 14px 28px;
+  background: var(--bg); color: var(--tx1);
+  font-family: var(--font); font-size: 15px; line-height: 22px; font-variant-numeric: tabular-nums;
+  padding-left: var(--gx); padding-right: var(--gxr); padding-block: 20px 40px;
 }
 button, select, input { font: inherit; color: inherit; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--blue-text); outline-offset: 2px; }
 
-.top { display: grid; gap: 6px; max-width: 1480px; margin: 0 auto 12px; }
-.top-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.top-row .status { margin-left: auto; }
+/* Header */
+.top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px 28px; max-width: 1480px; margin: 0 auto 20px; }
+.brand { margin: 0; font-size: 20px; line-height: 28px; font-weight: 700; white-space: nowrap; }
+.brand .accent { color: var(--blue-text); }
+.tagline { color: var(--tx3); margin: 0; font-size: 13px; line-height: 19px; max-width: 74ch; text-wrap: pretty; }
+.top-end { display: flex; align-items: center; gap: 12px; }
+.status { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 16px; background: var(--s1); color: var(--tx2); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--tx4); flex: none; }
+body[data-state="ready"] .status::before { background: var(--ok); }
+body[data-state="rendering"] .status::before { background: var(--blue-text); animation: pulse 1s ease-in-out infinite; }
+body[data-state="error"] .status::before { background: var(--bad); }
+@keyframes pulse { 50% { opacity: 0.3; } }
+
+.app { display: grid; gap: 20px; max-width: 1480px; margin: 0 auto; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+
+/* Shared controls */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 4px; background: var(--s2); border-radius: var(--r-md); }
+.seg button { min-height: 36px; padding: 6px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--tx3); font-size: 14px; line-height: 18px; font-weight: 600; cursor: pointer; text-wrap: balance; transition: background-color 0.15s, color 0.15s; }
+.seg button[aria-pressed="true"] { background: var(--seg-on); color: var(--tx1); box-shadow: var(--seg-shadow); }
+.seg.lines button { white-space: pre-line; min-height: 48px; font-size: 13px; line-height: 17px; }
 .lang { grid-auto-columns: minmax(52px, auto); }
-.lang button { min-height: 34px; padding: 6px 12px; font-size: 13px; }
-.zoom { width: 132px; flex: none; }
-.brand {
-  font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.06em;
-  text-transform: uppercase; font-variation-settings: "wdth" 125; margin: 0;
-}
-.brand .accent { color: var(--accent); }
-.tagline { color: var(--muted); margin: 0; max-width: 90ch; }
-.status { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.lang button { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.zoom button { min-height: 30px; padding: 2px 4px; }
 
-.app {
-  display: grid; gap: 16px; max-width: 1480px; margin: 0 auto;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  align-items: start;
-}
-@media (max-width: 980px) { .app { grid-template-columns: minmax(0, 1fr); } }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-md); background: var(--s3); color: var(--tx1); font-size: 15px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: transform 0.12s ease-out, background-color 0.15s; }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-weak { background: var(--blue-tint); color: var(--blue-text); }
+.btn-sm { height: 36px; padding: 0 14px; border-radius: 10px; font-size: 13px; }
 
-/* Viewfinder */
-.stage { display: grid; gap: 12px; min-width: 0; }
-.viewfinder {
-  position: relative; width: 100%; aspect-ratio: 3 / 2; background: var(--stage);
-  border-radius: var(--radius); overflow: hidden; cursor: crosshair; touch-action: manipulation;
-  max-width: 100%;
+select {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 52px; padding: 0 44px 0 16px; border: 0; cursor: pointer; text-overflow: ellipsis;
+  background: var(--s2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1.5 1.5l5.5 5.5 5.5-5.5' fill='none' stroke='%238B929D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 18px center / 14px 9px;
+  border-radius: var(--r-md); font-size: 16px; font-weight: 500; color: var(--tx1);
 }
+select option { background: var(--s2); color: var(--tx1); }
+
+input[type="range"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 28px; margin: 0; padding: 0; background: transparent; cursor: pointer; --fill: 0%; }
+input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--blue) var(--fill), var(--s3) var(--fill)); }
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--blue) var(--fill), var(--s3) var(--fill)); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 50%; background: #fff; border: 0; box-shadow: var(--thumb-shadow); }
+input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 0; box-shadow: var(--thumb-shadow); }
+input[type="range"]:focus-visible { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: var(--thumb-shadow), 0 0 0 4px var(--blue-tint); }
+input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--thumb-shadow), 0 0 0 4px var(--blue-tint); }
+input[type="range"]:disabled { cursor: default; opacity: 0.5; }
+
+/* Checkboxes are drawn as switches; the label text sits left, the switch right */
+.check { display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 16px; font-size: 15px; line-height: 22px; font-weight: 500; cursor: pointer; }
+.check input { -webkit-appearance: none; appearance: none; flex: none; position: relative; width: 50px; height: 30px; margin: 0; border-radius: 15px; background: var(--s3); cursor: pointer; transition: background-color 0.18s; }
+.check input::after { content: ""; position: absolute; left: 2px; top: 2px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transition: transform 0.18s ease-out; }
+.check input:checked { background: var(--blue); }
+.check input:checked::after { transform: translateX(20px); }
+.check input:focus-visible { outline: 2px solid var(--blue-text); outline-offset: 2px; }
+
+.card { background: var(--s1); border-radius: var(--r-xl); padding: 20px; min-width: 0; }
+.card h2, .group > h2 { margin: 0; font-size: 17px; line-height: 24px; font-weight: 700; text-wrap: balance; }
+.card h2 { margin-bottom: 16px; }
+.hint { color: var(--tx3); font-size: 13px; line-height: 19px; margin: 12px 0 0; }
+.tag { height: 22px; display: inline-flex; align-items: center; padding: 0 9px; border-radius: 11px; background: var(--blue-tint); color: var(--blue-text); font-size: 12px; font-weight: 600; }
+
+/* Viewfinder column */
+.stage { display: grid; gap: 16px; min-width: 0; }
+.dock { display: grid; gap: 16px; min-width: 0; }
+.viewfinder { position: relative; width: 100%; aspect-ratio: 3 / 2; background: var(--stage); border-radius: var(--r-lg); overflow: hidden; cursor: crosshair; touch-action: manipulation; max-width: 100%; }
 .viewfinder.comparing { touch-action: none; }
 .viewfinder canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* AF point as four corner brackets; white so it reads on any picture */
 .af {
-  position: absolute; width: var(--loupe, 40px); height: var(--loupe, 40px); transform: translate(-50%, -50%);
-  border: 1.5px solid var(--accent); border-radius: 2px; pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-  min-width: 14px; min-height: 14px;
+  --len: 9px; --c: #fff;
+  position: absolute; width: var(--loupe, 40px); height: var(--loupe, 40px); transform: translate(-50%, -50%); pointer-events: none; min-width: 16px; min-height: 16px;
+  background:
+    linear-gradient(var(--c), var(--c)) 0 0 / var(--len) 2px no-repeat, linear-gradient(var(--c), var(--c)) 0 0 / 2px var(--len) no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 0 / var(--len) 2px no-repeat, linear-gradient(var(--c), var(--c)) 100% 0 / 2px var(--len) no-repeat,
+    linear-gradient(var(--c), var(--c)) 0 100% / var(--len) 2px no-repeat, linear-gradient(var(--c), var(--c)) 0 100% / 2px var(--len) no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / var(--len) 2px no-repeat, linear-gradient(var(--c), var(--c)) 100% 100% / 2px var(--len) no-repeat;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
 }
-.af::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: var(--accent); border-radius: 50%; }
-.vf-info {
-  position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 18px; align-items: center;
-  padding: 7px 12px; background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
-  font-family: var(--font-data); font-size: 13px; color: var(--stage-fg); pointer-events: none;
-  font-variant-numeric: tabular-nums; flex-wrap: wrap;
-}
-.vf-info .mode { background: var(--accent); color: #1b1404; padding: 0 5px; border-radius: 2px; font-weight: 600; }
+.af::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: #fff; border-radius: 50%; }
+.vf-info { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 6px 16px; align-items: center; padding: 28px 16px 12px; background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0)); font-size: 15px; line-height: 20px; font-weight: 600; color: var(--stage-fg); pointer-events: none; flex-wrap: wrap; }
+.vf-info .mode { background: #fff; color: #111; padding: 0 7px; border-radius: 6px; font-weight: 700; }
 .vf-info .grow { flex: 1; }
-.progress { position: absolute; left: 0; top: 0; height: 2px; width: calc(var(--p, 0) * 100%); background: var(--accent); transition: opacity 0.4s; }
+.progress { position: absolute; left: 0; top: 0; height: 3px; width: calc(var(--p, 0) * 100%); background: var(--blue-text); transition: opacity 0.4s; }
 .progress[data-done="true"] { opacity: 0; }
-.split { position: absolute; top: 0; bottom: 0; width: 0; pointer-events: none; }
-.split::before {
-  content: "⟷"; position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%);
-  width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); color: #111;
-  display: grid; place-items: center; font-size: 15px; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
-}
-.ab-labels { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; gap: 8px; }
-.ab-labels span {
-  font-family: var(--font-data); font-size: 11px; color: var(--stage-fg); background: rgba(0, 0, 0, 0.6);
-  padding: 3px 7px; border-radius: 3px; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.gpu-error {
-  position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; gap: 6px;
-  color: var(--stage-fg);
-}
-.gpu-error strong { font-family: var(--font-display); font-variation-settings: "wdth" 112; font-size: 18px; }
+.split { position: absolute; top: 0; bottom: 0; width: 0; pointer-events: none; border-left: 2px solid #fff; }
+.split:focus-visible { outline: none; }
+.split:focus-visible::before { outline: 2px solid var(--blue-text); outline-offset: 2px; }
+.split::before { content: "⟷"; position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); width: 32px; height: 32px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; font-size: 15px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); }
+.ab-labels { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; gap: 8px; }
+.ab-labels span { font-size: 12px; line-height: 16px; font-weight: 600; color: #fff; background: rgba(0, 0, 0, 0.6); padding: 4px 10px; border-radius: 12px; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Phone-only shortcut over the picture, so A/B can be started while the settings are in use */
+.vf-chip { display: none; position: absolute; top: 12px; right: 12px; z-index: 4; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: transform 0.12s ease-out; }
+.vf-chip:active { transform: scale(0.96); }
+.gpu-error { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; gap: 6px; color: var(--stage-fg); }
+.gpu-error strong { font-size: 18px; }
 .gpu-error p { margin: 0; color: #b6b2aa; max-width: 52ch; }
 
-/* Focus scale + meter strip */
-.strip {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center;
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px;
-}
-@media (max-width: 640px) { .strip { grid-template-columns: minmax(0, 1fr); } }
-.strip-label { font-family: var(--font-display); font-variation-settings: "wdth" 112; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-.strip-label b { font-family: var(--font-data); font-weight: 600; color: var(--fg); letter-spacing: 0; text-transform: none; font-size: 13px; }
-#focus-scale { width: 100%; height: 56px; display: block; cursor: ew-resize; touch-action: none; }
-.fs-axis { stroke: var(--line); stroke-width: 2; }
-.fs-tick { stroke: var(--muted); stroke-width: 1.5; }
-.fs-label { fill: var(--fg); font-family: var(--font-data); font-size: 11px; text-anchor: middle; }
-.fs-dof { fill: var(--accent); opacity: 0.28; }
-.fs-hyper { stroke: var(--info); stroke-width: 1.5; stroke-dasharray: 3 3; }
-.fs-hyper-t { fill: var(--info); font-family: var(--font-data); font-size: 10px; text-anchor: middle; }
-.fs-pointer { fill: var(--accent); }
-.fs-pointer-line { stroke: var(--accent); stroke-width: 2; }
-#meter { width: 220px; height: 34px; display: block; }
-.m-major { stroke: var(--fg); stroke-width: 1.5; }
-.m-minor { stroke: var(--muted); stroke-width: 1; }
-.m-label { fill: var(--muted); font-family: var(--font-data); font-size: 10px; text-anchor: middle; }
-.m-bar { fill: var(--accent); }
-.m-pointer { fill: var(--accent); }
+/* Focus scale + exposure meter */
+.strip { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 12px 28px; align-items: start; background: var(--s1); border-radius: var(--r-xl); padding: 16px 20px; }
+.strip-col { min-width: 0; }
+.strip-head { display: flex; align-items: center; gap: 4px 10px; min-height: 36px; flex-wrap: wrap; }
+.strip-label { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--tx3); }
+.strip-val { font-size: 17px; line-height: 24px; font-weight: 700; }
+.strip-head .btn { margin-left: auto; }
+.btn-aim-chip { display: none; }
+.strip-hint { margin: 2px 0 0; font-size: 13px; line-height: 18px; color: var(--tx3); }
+#focus-scale { width: 100%; height: 58px; display: block; cursor: ew-resize; touch-action: none; border-radius: 8px; }
+#focus-scale:focus-visible { outline: 2px solid var(--blue-text); outline-offset: 0; }
+.fs-barrel { fill: var(--s2); }
+.fs-tick { stroke: var(--tx3); stroke-width: 1.5; stroke-linecap: round; }
+.fs-tick.minor { stroke-width: 1; opacity: 0.6; }
+.fs-label { fill: var(--tx2); font-family: var(--font); font-size: 12px; font-weight: 500; text-anchor: middle; }
+.fs-unit { fill: var(--tx3); font-family: var(--font); font-size: 12px; font-weight: 500; }
+.fs-dof { fill: var(--blue); opacity: 0.4; }
+.fs-dof-edge { stroke: var(--blue-text); stroke-width: 1.5; opacity: 0.9; }
+.fs-hyper { stroke: var(--tx3); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.fs-hyper-t { fill: var(--tx3); font-family: var(--font); font-size: 12px; font-weight: 600; text-anchor: middle; }
+.fs-pointer { fill: var(--blue-text); }
+.fs-pointer-line { stroke: var(--blue-text); stroke-width: 2; stroke-linecap: round; }
+#meter { width: 100%; height: 40px; display: block; }
+.m-axis { stroke: var(--s3); stroke-width: 2; stroke-linecap: round; }
+.m-major { stroke: var(--tx2); stroke-width: 1.5; stroke-linecap: round; }
+.m-minor { stroke: var(--tx3); stroke-width: 1; stroke-linecap: round; opacity: 0.75; }
+.m-label { fill: var(--tx3); font-family: var(--font); font-size: 12px; font-weight: 500; text-anchor: middle; }
+.m-label.zero { fill: var(--tx1); font-weight: 700; }
+.m-bar { fill: var(--blue-text); }
+.m-pointer { fill: var(--blue-text); }
 
 /* Loupe + readouts */
-.below { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; align-items: start; }
-@media (max-width: 760px) { .below { grid-template-columns: minmax(0, 1fr); } }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
-.card h2 {
-  margin: 0 0 8px; font-family: var(--font-display); font-weight: 650; font-variation-settings: "wdth" 115;
-  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; text-wrap: balance;
-}
-.loupe-frame { position: relative; width: 100%; aspect-ratio: 1; background: var(--stage); border-radius: 4px; overflow: hidden; max-width: 100%; }
+.below { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; align-items: start; }
+.loupe-frame { position: relative; width: 100%; aspect-ratio: 1; background: var(--stage); border-radius: var(--r-md); overflow: hidden; max-width: 100%; margin-top: 12px; }
 .loupe-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
-.loupe-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-.hint { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
-
-.readouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 18px; margin: 0; }
-.readouts div { min-width: 0; border-top: 1px solid var(--line); padding-top: 7px; }
-.readouts dt { font-family: var(--font-display); font-variation-settings: "wdth" 112; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.readouts dd { margin: 2px 0 0; font-family: var(--font-data); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.readouts dd small { display: block; font-family: var(--font-body); font-weight: 400; font-size: 12px; color: var(--muted); }
-.warnings { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
-.warnings li { padding: 6px 10px 6px 12px; border-radius: 4px; background: var(--panel-2); border-left: 3px solid var(--info); font-size: 13px; }
-.warnings .chip-warn { border-left-color: var(--warn); }
-.warnings .chip-bad { border-left-color: var(--bad); }
+.loupe-foot { margin-top: 16px; }
+.readouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px 24px; margin: 0; }
+.readouts div { min-width: 0; }
+.readouts dt { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--tx3); }
+.readouts dd { margin: 2px 0 0; font-size: 20px; line-height: 28px; font-weight: 700; }
+.readouts dd small { display: block; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--tx3); }
+.warnings { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 8px; }
+.warnings:empty { display: none; }
+.warnings li { display: flex; gap: 10px; align-items: baseline; padding: 12px 14px; border-radius: var(--r-md); background: var(--s2); font-size: 14px; line-height: 20px; }
+.warnings li::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--info); transform: translateY(-1px); }
+.warnings .chip-warn::before { background: var(--warn); }
+.warnings .chip-bad::before { background: var(--bad); }
 
 /* Controls */
-.controls { display: grid; gap: 12px; min-width: 0; }
-.group { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
-.group > h2 {
-  margin: 0; font-family: var(--font-display); font-weight: 650; font-variation-settings: "wdth" 115;
-  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+.controls { display: grid; gap: 16px; min-width: 0; }
+.group { background: var(--s1); border-radius: var(--r-xl); padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.group > h2 { margin-bottom: 0; }
+label.field { display: grid; gap: 6px; }
+.field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--tx3); }
+.field-label output, .val { font-size: 16px; line-height: 22px; font-weight: 700; color: var(--blue-text); }
+.is-auto .val::after { content: var(--auto-label); color: var(--tx3); font-weight: 500; font-size: 13px; }
+.note { color: var(--tx3); font-size: 13px; line-height: 19px; margin: 0; }
+.note:empty { display: none; }
+.chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chip { min-height: 52px; padding: 10px 14px; border: 0; border-radius: var(--r-md); background: var(--s2); color: var(--tx2); font-size: 14px; line-height: 19px; font-weight: 500; text-align: left; cursor: pointer; transition: transform 0.12s ease-out, background-color 0.15s; }
+.chip:active { transform: scale(0.97); }
+.chip[aria-pressed="true"] { background: var(--blue-tint); color: var(--blue-text); font-weight: 600; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.focus-line { display: grid; gap: 12px; }
+.tabs { display: none; }
+@media (hover: hover) {
+  .btn:hover:not(:disabled), .vf-chip:hover, .chip:hover { box-shadow: inset 0 0 0 999px var(--hover); }
+  .seg button:not([aria-pressed="true"]):hover { color: var(--tx1); }
 }
-label.field { display: grid; gap: 4px; }
-.field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
-.field-label output, .val { font-family: var(--font-data); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); }
-.is-auto .val::after { content: var(--auto-label); color: var(--muted); font-weight: 400; font-size: 11px; }
-select {
-  width: 100%; padding: 7px 9px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
+@media (pointer: coarse) { input[type="range"] { height: 36px; } }
+@media (prefers-reduced-motion: reduce) { .progress, .btn, .chip, .seg button, .check input, .check input::after, .vf-chip { transition: none; } body[data-state="rendering"] .status::before { animation: none; } }
+
+/* Tablet and phone. The viewfinder, focus scale and tab bar stay pinned to the top of the screen; the tabs
+   choose which panel scrolls beneath them. The page itself scrolls, so the browser's own scroll,
+   pickers and keyboard behave normally. Panels that are not selected are collapsed rather than removed,
+   so the loupe keeps its width and stays rendered at the right size. */
+@media (max-width: 980px) {
+  body { background: var(--s1); padding-top: 0; padding-bottom: 32px; }
+  .top { background: var(--bg); margin: 0 calc(var(--gxr) * -1) 0 calc(var(--gx) * -1); padding: 16px var(--gxr) 14px var(--gx); }
+  .app { display: flex; flex-direction: column; gap: 0; align-items: stretch; }
+  .stage { display: contents; }
+  .dock { order: 1; position: sticky; top: 0; z-index: 30; gap: 0; background: var(--bg); margin-inline: calc(var(--gx) * -1) calc(var(--gxr) * -1); }
+  .viewfinder { border-radius: 0; width: 100%; }
+  .vf-chip { display: block; }
+  .ab-labels { top: 54px; }
+  .strip { background: transparent; border-radius: 0; padding: 4px var(--gxr) 10px var(--gx); grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .strip-head { min-height: 32px; }
+  .strip-hint { display: none; }
+  .strip .meter-col { display: none; }
+  .btn-aim-chip { display: inline-flex; }
+  .tabs { display: flex; gap: 22px; padding: 0 var(--gxr) 0 var(--gx); overflow-x: auto; scrollbar-width: none; background: var(--s1); border-radius: 24px 24px 0 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.22); }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { position: relative; flex: none; height: 52px; padding: 0; border: 0; background: none; color: var(--tx3); font-size: 15px; font-weight: 600; cursor: pointer; }
+  .tabs button[aria-selected="true"] { color: var(--tx1); }
+  .tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 1px; background: var(--blue-text); }
+  .controls { order: 2; display: block; padding-top: 20px; }
+  .below { order: 3; display: block; }
+  .group, .card { background: transparent; border-radius: 0; padding: 0 0 8px; }
+  .group { gap: 20px; }
+  .below .card + .card { margin-top: 28px; }
+  .controls > .group[data-panel="focus"], .controls > .group[data-panel="compare"] { display: none; }
+  [data-panel].is-off { height: 0; overflow: hidden; visibility: hidden; padding: 0; margin: 0; }
+  .group > h2 { display: none; }
+  .readouts { grid-template-columns: 1fr 1fr; }
 }
-.note { color: var(--muted); font-size: 12.5px; margin: 0; }
-input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0; }
-input[type="range"]:disabled { opacity: 0.45; }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
-.seg button { border: 0; background: var(--panel-2); padding: 6px 4px; cursor: pointer; font-size: 12.5px; border-left: 1px solid var(--line); }
-.seg button:first-child { border-left: 0; }
-.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 650; }
-.chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.chip { border: 1px solid var(--line); background: var(--panel-2); border-radius: 4px; padding: 7px 8px; text-align: left; cursor: pointer; font-size: 12.5px; line-height: 1.25; }
-.chip[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.check { display: flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
-.check input { accent-color: var(--accent); width: 16px; height: 16px; }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 4px; padding: 7px 10px; cursor: pointer; font-size: 13px; }
-.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
-.focus-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
-@media (prefers-reduced-motion: reduce) { .progress { transition: none; } }
-/* Korean: keep words whole and relax the tracking used for Latin capitals */
+@media (min-width: 641px) and (max-width: 980px) {
+  .viewfinder { width: min(100%, calc(38vh * var(--ar, 1.5))); width: min(100%, calc(38dvh * var(--ar, 1.5))); margin-inline: auto; }
+  .strip { grid-template-columns: minmax(0, 1fr) 240px; gap: 12px 28px; padding-top: 8px; }
+  .strip .meter-col { display: block; }
+  .strip-hint { display: block; }
+}
+@media (max-width: 760px) {
+  .top { grid-template-columns: minmax(0, 1fr) auto; }
+  .tagline { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (max-width: 640px) { .below { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) {
+  .brand { font-size: 17px; }
+  .top-end { gap: 8px; }
+  .status { font-size: 0; padding: 0; background: none; gap: 0; height: auto; }
+  .vf-info { font-size: 14px; padding: 24px 14px 10px; gap: 4px 12px; }
+}
+@media (max-width: 400px) { .tabs { gap: 14px; } .tabs button { font-size: 14px; } }
+@media (max-width: 340px) { .tabs { gap: 8px; } .tabs button { font-size: 13px; } .strip-head .strip-label { display: none; } }
+@media (max-width: 380px) { .brand { white-space: normal; line-height: 22px; } }
+/* Short phones: cap the pinned picture so the settings keep room */
+@media (max-width: 640px) and (max-height: 700px) {
+  .viewfinder { width: min(100%, calc(36vh * var(--ar, 1.5))); width: min(100%, calc(36dvh * var(--ar, 1.5))); margin-inline: auto; }
+}
+@media (max-width: 640px) and (max-height: 600px) {
+  .viewfinder { width: min(100%, calc(32vh * var(--ar, 1.5))); width: min(100%, calc(32dvh * var(--ar, 1.5))); }
+}
+@media (max-width: 980px) and (max-height: 520px) { .dock { position: static; } }
 :root[lang="ko"] { --auto-label: " 자동"; }
 :root[lang="ko"] body { word-break: keep-all; overflow-wrap: break-word; }
-:root[lang="ko"] .brand, :root[lang="ko"] .group > h2, :root[lang="ko"] .card h2,
-:root[lang="ko"] .strip-label, :root[lang="ko"] .readouts dt { letter-spacing: 0.02em; }
-:root[lang="ko"] .group > h2, :root[lang="ko"] .card h2, :root[lang="ko"] .readouts dt { font-size: 12.5px; }
 </style>
 </head>
 <body>
 <header class="top">
-  <div class="top-row">
-    <h1 class="brand"><span data-i18n="brand.a">Lens View</span> <span class="accent" data-i18n="brand.b">Simulator</span></h1>
+  <h1 class="brand"><span data-i18n="brand.a">Lens View</span> <span class="accent" data-i18n="brand.b">Simulator</span></h1>
+  <p class="tagline" data-i18n="tagline">Choose a body, a lens and a location. The frame renders through the lens and onto the sensor you picked, so differences in focus, blur, flare, sharpness and noise show up as they would in the photo.</p>
+  <div class="top-end">
     <span class="status" id="status" role="status" data-i18n="status.starting">Starting WebGPU…</span>
     <div class="seg lang" role="group" aria-label="Language" data-i18n-aria="aria.lang">
       <button type="button" data-lang="en" id="lang-en" lang="en">EN</button>
       <button type="button" data-lang="ko" id="lang-ko" lang="ko">한국어</button>
     </div>
   </div>
-  <p class="tagline" data-i18n="tagline">Choose a body, a lens and a location. The frame renders through the lens and onto the sensor you picked, so differences in focus, blur, flare, sharpness and noise show up as they would in the photo.</p>
 </header>
 
-<main class="app">
+<main class="app" data-tab="exposure">
   <section class="stage" aria-label="Viewfinder and results" data-i18n-aria="aria.stage">
-    <div class="viewfinder" id="viewfinder">
-      <canvas id="view" aria-label="Rendered photograph. Click to focus there." data-i18n-aria="aria.view"></canvas>
-      <div class="af" id="af-box" aria-hidden="true"></div>
-      <div class="split" id="split" hidden></div>
-      <div class="ab-labels" id="ab-labels" hidden><span>A · <span id="held-desc"></span></span><span data-i18n="ab.live">B · live</span></div>
-      <div class="progress" id="progress"></div>
-      <div class="vf-info" aria-live="off">
-        <span class="mode" id="vf-mode">A</span>
-        <span id="vf-shutter">1/250</span>
-        <span id="vf-aperture">F2.8</span>
-        <span id="vf-iso">ISO 100</span>
-        <span id="vf-ev">+0.0</span>
-        <span class="grow"></span>
-        <span id="vf-focal">50mm</span>
+    <div class="dock">
+      <div class="viewfinder" id="viewfinder">
+        <canvas id="view" aria-label="Rendered photograph. Click to focus there." data-i18n-aria="aria.view"></canvas>
+        <div class="af" id="af-box" aria-hidden="true"></div>
+        <div class="split" id="split" hidden role="slider" tabindex="0" aria-label="Comparison divider" data-i18n-aria="aria.split" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
+        <div class="ab-labels" id="ab-labels" hidden><span>A · <span id="held-desc"></span></span><span><span data-i18n="ab.live">B · live</span> · <span id="live-desc"></span></span></div>
+        <div class="progress" id="progress"></div>
+        <button type="button" class="vf-chip" id="hold-chip" data-i18n="chip.hold">Hold as A</button>
+        <div class="vf-info" aria-live="off">
+          <span class="mode" id="vf-mode">A</span>
+          <span id="vf-shutter">1/250</span>
+          <span id="vf-aperture">F2.8</span>
+          <span id="vf-iso">ISO 100</span>
+          <span id="vf-ev">+0.0</span>
+          <span class="grow"></span>
+          <span id="vf-focal">50mm</span>
+        </div>
+        <div class="gpu-error" id="gpu-error" hidden>
+          <strong data-i18n="gpu.title">WebGPU is not available here</strong>
+          <p id="gpu-error-detail"></p>
+          <p data-i18n="gpu.help">Open this page in a current Chrome, Edge or Safari with WebGPU turned on. The readouts below still update.</p>
+        </div>
       </div>
-      <div class="gpu-error" id="gpu-error" hidden>
-        <strong data-i18n="gpu.title">WebGPU is not available here</strong>
-        <p id="gpu-error-detail"></p>
-        <p data-i18n="gpu.help">Open this page in a current Chrome, Edge or Safari with WebGPU turned on. The readouts below still update.</p>
+
+      <div class="strip">
+        <div class="strip-col">
+          <div class="strip-head">
+            <span class="strip-label" data-i18n="strip.focus">Focus</span>
+            <b class="strip-val" id="focus-val">2.40 m</b>
+            <span class="tag" id="focus-src">Subject</span>
+            <button type="button" class="btn btn-sm btn-weak btn-aim-chip" id="refocus-chip" data-i18n="focus.refocus">Focus on subject</button>
+          </div>
+          <svg id="focus-scale" role="slider" tabindex="0" aria-label="Focus distance" data-i18n-aria="aria.focusScale" aria-valuetext="focus distance"></svg>
+          <p class="strip-hint" data-i18n="strip.hint">Drag the scale or click the picture to focus.</p>
+        </div>
+        <div class="strip-col meter-col">
+          <div class="strip-head">
+            <span class="strip-label" data-i18n="strip.exposure">Exposure</span>
+            <b class="strip-val" id="meter-val">+0.0 EV</b>
+          </div>
+          <svg id="meter" aria-label="Exposure meter" data-i18n-aria="aria.meter"></svg>
+        </div>
       </div>
+
+      <nav class="tabs" role="tablist" aria-label="Settings" data-i18n-aria="aria.tabs">
+        <button type="button" role="tab" data-tab="gear" id="tab-gear" data-i18n="group.gear">Gear</button>
+        <button type="button" role="tab" data-tab="location" id="tab-location" data-i18n="group.location">Location</button>
+        <button type="button" role="tab" data-tab="exposure" id="tab-exposure" aria-selected="true" data-i18n="group.exposure">Exposure</button>
+        <button type="button" role="tab" data-tab="picture" id="tab-picture" data-i18n="group.picture">Picture</button>
+        <button type="button" role="tab" data-tab="results" id="tab-results" data-i18n="tab.results">Results</button>
+      </nav>
     </div>
 
-    <div class="strip">
-      <div>
-        <div class="strip-label"><span data-i18n="strip.focus">Focus</span> <b id="focus-val">2.40 m</b> <span id="focus-src">Subject</span> <span data-i18n="strip.hint">· drag the scale or click the picture</span></div>
-        <svg id="focus-scale" role="slider" tabindex="0" aria-label="Focus distance" data-i18n-aria="aria.focusScale" aria-valuetext="focus distance"></svg>
-      </div>
-      <div>
-        <div class="strip-label" data-i18n="strip.exposure">Exposure</div>
-        <svg id="meter" aria-label="Exposure meter" data-i18n-aria="aria.meter"></svg>
-      </div>
-    </div>
-
-    <div class="below">
+    <div class="below" data-panel="results">
       <div class="card">
-        <h2><span data-i18n="loupe.title">100% at AF point</span>
-          <span class="seg zoom" role="group" aria-label="Loupe magnification" data-i18n-aria="aria.zoom">
-            <button type="button" data-zoom="1" id="zoom-1">1:1</button>
-            <button type="button" data-zoom="2" id="zoom-2">2:1</button>
-            <button type="button" data-zoom="4" id="zoom-4">4:1</button>
-          </span>
-        </h2>
+        <h2 data-i18n="loupe.title">100% at AF point</h2>
+        <div class="seg zoom" role="group" aria-label="Loupe magnification" data-i18n-aria="aria.zoom">
+          <button type="button" data-zoom="1" id="zoom-1">1:1</button>
+          <button type="button" data-zoom="2" id="zoom-2">2:1</button>
+          <button type="button" data-zoom="4" id="zoom-4">4:1</button>
+        </div>
         <div class="loupe-frame"><canvas id="loupe" aria-label="Pixel-level crop at the focus point" data-i18n-aria="aria.loupe"></canvas></div>
         <div class="loupe-foot">
           <label class="check"><input type="checkbox" id="grid" checked> <span data-i18n="loupe.grid">Pixel grid at 4:1</span></label>
@@ -298,7 +403,7 @@ input[type="range"]:disabled { opacity: 0.45; }
   </section>
 
   <aside class="controls" aria-label="Camera settings" data-i18n-aria="aria.controls">
-    <section class="group">
+    <section class="group" data-panel="gear">
       <h2 data-i18n="group.gear">Gear</h2>
       <label class="field"><span class="field-label" data-i18n="field.camera">Camera body</span><select id="camera"></select></label>
       <p class="note" id="cam-spec"></p>
@@ -307,7 +412,7 @@ input[type="range"]:disabled { opacity: 0.45; }
       <label class="field" id="focal-row"><span class="field-label"><span data-i18n="field.focal">Focal length</span> <output id="focal-val"></output></span><input type="range" id="focal" step="1"></label>
     </section>
 
-    <section class="group">
+    <section class="group" data-panel="location">
       <h2 data-i18n="group.location">Location</h2>
       <div class="chips" id="scenes"></div>
       <p class="note" id="scene-note"></p>
@@ -315,7 +420,7 @@ input[type="range"]:disabled { opacity: 0.45; }
       <label class="check"><input type="checkbox" id="keep" checked> <span data-i18n="field.keep">Keep subject size when changing focal length</span></label>
     </section>
 
-    <section class="group">
+    <section class="group" data-panel="exposure">
       <h2 data-i18n="group.exposure">Exposure</h2>
       <div class="seg" role="group" aria-label="Exposure mode" data-i18n-aria="aria.mode">
         <button type="button" data-mode="A" id="mode-a" data-i18n="mode.A">Aperture priority</button>
@@ -327,11 +432,11 @@ input[type="range"]:disabled { opacity: 0.45; }
       <label class="field" id="iso-row"><span class="field-label"><span data-i18n="field.iso">ISO</span> <span class="val" id="iso-val"></span></span><input type="range" id="iso" min="0" step="1"></label>
       <label class="field" id="ec-row"><span class="field-label"><span data-i18n="field.ec">Exposure compensation</span> <output id="ec-val"></output></span><input type="range" id="ec" min="-3" max="3" step="0.3333333"></label>
       <div class="field"><span class="field-label" data-i18n="field.nd">ND filter</span>
-        <div class="seg" role="group" aria-label="ND filter" data-i18n-aria="aria.nd">
+        <div class="seg lines" role="group" aria-label="ND filter" data-i18n-aria="aria.nd">
           <button type="button" data-nd="0" id="nd-0" data-i18n="nd.0">None</button>
-          <button type="button" data-nd="3" id="nd-3" data-i18n="nd.3">ND8 · 3 stops</button>
-          <button type="button" data-nd="6" id="nd-6" data-i18n="nd.6">ND64 · 6</button>
-          <button type="button" data-nd="10" id="nd-10" data-i18n="nd.10">ND1000 · 10</button>
+          <button type="button" data-nd="3" id="nd-3" data-i18n="nd.3">ND8&#10;3 stops</button>
+          <button type="button" data-nd="6" id="nd-6" data-i18n="nd.6">ND64&#10;6 stops</button>
+          <button type="button" data-nd="10" id="nd-10" data-i18n="nd.10">ND1000&#10;10 stops</button>
         </div>
       </div>
       <div class="seg" role="group" aria-label="Support" data-i18n-aria="aria.support">
@@ -341,21 +446,25 @@ input[type="range"]:disabled { opacity: 0.45; }
       </div>
     </section>
 
-    <section class="group">
+    <section class="group" data-panel="focus">
       <h2 data-i18n="group.focus">Focus</h2>
-      <div class="focus-line"><span class="note" data-i18n="focus.note">Click anywhere in the picture to focus there.</span><button type="button" class="btn" id="refocus" data-i18n="focus.refocus">Focus on subject</button></div>
+      <div class="focus-line"><span class="note" data-i18n="focus.note">Click anywhere in the picture to focus there.</span><button type="button" class="btn btn-weak" id="refocus" data-i18n="focus.refocus">Focus on subject</button></div>
     </section>
 
-    <section class="group">
+    <section class="group" data-panel="picture">
       <h2 data-i18n="group.picture">Picture</h2>
       <div class="row2">
         <label class="field"><span class="field-label" data-i18n="field.wb">White balance</span><select id="wb"></select></label>
         <label class="field"><span class="field-label" data-i18n="field.style">Style</span><select id="style"></select></label>
       </div>
       <label class="check"><input type="checkbox" id="zebra"> <span data-i18n="field.zebra">Show clipped highlights</span></label>
+      <div class="row2">
+        <button type="button" class="btn btn-weak" id="share" data-i18n="share.copy">Copy link</button>
+        <button type="button" class="btn" id="reset" data-i18n="reset.label">Reset settings</button>
+      </div>
     </section>
 
-    <section class="group">
+    <section class="group" data-panel="compare">
       <h2 data-i18n="group.compare">Compare</h2>
       <p class="note" data-i18n="compare.note">Hold the current picture as A, then change anything. Drag the divider on the picture to compare A with the live B.</p>
       <div class="row2">
