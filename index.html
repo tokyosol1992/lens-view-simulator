@@ -84,7 +84,6 @@ button, select, input { font: inherit; color: inherit; }
   grid-template-columns: minmax(0, 1fr) 340px;
   align-items: start;
 }
-@media (max-width: 980px) { .app { grid-template-columns: minmax(0, 1fr); } }
 
 /* Viewfinder */
 .stage { display: grid; gap: 12px; min-width: 0; }
@@ -207,6 +206,13 @@ input[type="range"]:disabled { opacity: 0.45; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 4px; padding: 7px 10px; cursor: pointer; font-size: 13px; }
 .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.actions .grow { flex: 1; }
+.actions .btn { min-height: 36px; }
+.actions .hint { flex-basis: 100%; margin: 0; }
+.chips-wide { grid-template-columns: 1fr 1fr; }
+.spec-line { margin: -4px 0 0; }
+.spec-line.bad { color: var(--warn); }
 .focus-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
 @media (prefers-reduced-motion: reduce) { .progress { transition: none; } }
 /* Korean: keep words whole and relax the tracking used for Latin capitals */
@@ -215,6 +221,25 @@ input[type="range"]:disabled { opacity: 0.45; }
 :root[lang="ko"] .brand, :root[lang="ko"] .group > h2, :root[lang="ko"] .card h2,
 :root[lang="ko"] .strip-label, :root[lang="ko"] .readouts dt { letter-spacing: 0.02em; }
 :root[lang="ko"] .group > h2, :root[lang="ko"] .card h2, :root[lang="ko"] .readouts dt { font-size: 12.5px; }
+/* Wide screens: the settings column stays in view and scrolls on its own, so the picture and
+   the dials can be used together. */
+@media (min-width: 981px) {
+  .controls { position: sticky; top: 12px; max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
+}
+/* Narrow screens: one column in a task order. The picture is pinned at the top while the
+   gear and dials scroll underneath it; loupe and results come last. */
+@media (max-width: 980px) {
+  .app { display: flex; flex-direction: column; }
+  .stage { display: contents; }
+  .viewfinder { order: 1; position: sticky; top: 0; z-index: 5; align-self: center;
+    max-width: min(100%, calc(38dvh * var(--ar, 1.5))); box-shadow: 0 8px 14px -8px rgba(0, 0, 0, 0.55); }
+  .actions { order: 2; }
+  .strip { order: 3; }
+  .controls { order: 4; }
+  .below { order: 5; }
+  body { padding-top: 0; }
+  .top { margin-top: 14px; }
+}
 </style>
 </head>
 <body>
@@ -252,6 +277,15 @@ input[type="range"]:disabled { opacity: 0.45; }
         <p id="gpu-error-detail"></p>
         <p data-i18n="gpu.help">Open this page in a current Chrome, Edge or Safari with WebGPU turned on. The readouts below still update.</p>
       </div>
+    </div>
+
+    <div class="actions" role="group" aria-label="Compare and share" data-i18n-aria="aria.actions">
+      <button type="button" class="btn btn-primary" id="hold">Hold this view as A</button>
+      <button type="button" class="btn" id="clear-hold" hidden data-i18n="compare.stop">Stop comparing</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" id="copy-link" data-i18n="actions.copy">Copy link</button>
+      <button type="button" class="btn" id="reset" data-i18n="actions.reset">Reset</button>
+      <p class="hint" id="actions-hint" data-i18n="compare.hint">Hold this view as A, change the camera, lens or any setting, then drag the divider on the picture.</p>
     </div>
 
     <div class="strip">
@@ -299,10 +333,17 @@ input[type="range"]:disabled { opacity: 0.45; }
 
   <aside class="controls" aria-label="Camera settings" data-i18n-aria="aria.controls">
     <section class="group">
+      <h2 data-i18n="group.start">Quick starts</h2>
+      <div class="chips" id="presets"></div>
+      <p class="note" id="preset-look" data-i18n="start.note">One click sets up a comparison and tells you what to look at.</p>
+    </section>
+
+    <section class="group">
       <h2 data-i18n="group.gear">Gear</h2>
       <label class="field"><span class="field-label" data-i18n="field.camera">Camera body</span><select id="camera"></select></label>
       <p class="note" id="cam-spec"></p>
       <label class="field"><span class="field-label" data-i18n="field.lens">Lens</span><select id="lens"></select></label>
+      <p class="note spec-line" id="lens-spec"></p>
       <p class="note" id="lens-note"></p>
       <label class="field" id="focal-row"><span class="field-label"><span data-i18n="field.focal">Focal length</span> <output id="focal-val"></output></span><input type="range" id="focal" step="1"></label>
     </section>
@@ -355,14 +396,6 @@ input[type="range"]:disabled { opacity: 0.45; }
       <label class="check"><input type="checkbox" id="zebra"> <span data-i18n="field.zebra">Show clipped highlights</span></label>
     </section>
 
-    <section class="group">
-      <h2 data-i18n="group.compare">Compare</h2>
-      <p class="note" data-i18n="compare.note">Hold the current picture as A, then change anything. Drag the divider on the picture to compare A with the live B.</p>
-      <div class="row2">
-        <button type="button" class="btn btn-primary" id="hold">Hold this view as A</button>
-        <button type="button" class="btn" id="clear-hold" hidden data-i18n="compare.stop">Stop comparing</button>
-      </div>
-    </section>
   </aside>
 </main>
 <script type="module" src="src/main.js"></script>
