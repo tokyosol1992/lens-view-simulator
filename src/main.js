@@ -799,12 +799,14 @@ const directInputs = [
 ];
 for (const spec of directInputs) {
   const input = $(spec.id), feedback = document.createElement('small');
+  const entry = input.closest('.value-entry');
   feedback.className = 'input-feedback'; feedback.id = spec.id + '-feedback'; feedback.hidden = true;
   feedback.setAttribute('role', 'status');
-  input.setAttribute('aria-describedby', feedback.id);
+  input.setAttribute('aria-describedby', [input.getAttribute('aria-describedby'), feedback.id].filter(Boolean).join(' '));
   (input.closest('.field') || input.closest('.strip-col')).append(feedback);
   const format = spec.format || fmtInput;
-  input.addEventListener('input', () => { feedback.hidden = true; });
+  const clearFeedback = () => { feedback.hidden = true; entry.classList.remove('entry-error'); };
+  input.addEventListener('input', clearFeedback);
   input.addEventListener('change', () => {
     const text = input.value.trim();
     const parsed = text ? (spec.parse ? spec.parse(text) : Number(text)) : null;
@@ -812,6 +814,7 @@ for (const spec of directInputs) {
       input.value = format(spec.read());
       feedback.textContent = t(spec.parse ? 'input.invalidShutter' : 'input.invalid');
       feedback.hidden = false;
+      entry.classList.add('entry-error');
       return;
     }
     const [min, max] = spec.bounds();
@@ -819,6 +822,7 @@ for (const spec of directInputs) {
     const value = spec.parse ? bounded : +bounded.toFixed(3);
     spec.write(value);
     input.value = format(spec.read());
+    entry.classList.remove('entry-error');
     if (bounded !== parsed) {
       feedback.textContent = t('input.clamped', { min: format(min), max: format(max) });
       feedback.hidden = false;
@@ -827,7 +831,7 @@ for (const spec of directInputs) {
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') { event.preventDefault(); input.blur(); }
-    if (event.key === 'Escape') { input.value = format(spec.read()); feedback.hidden = true; input.blur(); }
+    if (event.key === 'Escape') { input.value = format(spec.read()); clearFeedback(); input.blur(); }
   });
 }
 
