@@ -20,3 +20,12 @@
 - 의미 있는 변경에서 HISTORY.md에 한국 시간 날짜·요청·판단·시도·실패/철회·검증·한계·다음 작업을 남긴다. STATUS·필요한 DECISIONS·README를 함께 갱신한다.
 - 커밋·푸시·PR·main 병합·배포와 실제 확인 결과를 구분한다. 미검증 사항을 완료로 쓰지 않는다. 토큰·개인 자료·브라우저 인증을 커밋하지 않는다.
 - 렌즈는 독립 저장소와 기존 Pages 주소를 유지한다. MoHo에 연결하거나 소스를 옮기는 후속은 별도 결정한다.
+
+## Node 24 실행 경로 · 실제 Claude 확인 후 수정 (2026-11-06)
+
+Claude의 기본 Bash 명령에서는 BASH_ENV가 설정돼도 Node 22가 우선될 수 있다. MoHo 새 Cloud 세션에서 이 차이를 확인했고 캐시 Node 24(v24.22.2)를 PATH 앞에 지정한 뒤 두 사이트 전체 빌드가 성공했다. Node·npm·pnpm 명령은 `bash scripts/with-node24.sh <명령> [인자...]`로 실행한다. 이 진입점은 Node 24를 확인하고 지정 명령을 그대로 실행하며, 22로 조용히 대체하지 않는다. 저장소 하위 폴더에서는 진입점 경로를 저장소 루트 기준으로 지정한다. SessionStart 설치도 이미 같은 캐시 경로를 먼저 사용한다.
+
+```bash
+bash scripts/with-node24.sh node --version
+bash scripts/with-node24.sh bash scripts/cloud-setup.sh
+```

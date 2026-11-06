@@ -63,3 +63,16 @@ Claude의 환경 설정 스크립트는 `scripts/claude-environment-setup.sh` �
 ## 이번 변경의 로컬 검사
 
 네 저장소의 셸 구문·SessionStart JSON·일반 Local 세션의 자동 설치 생략을 확인했다. 저장소 밖 `/tmp`에서 아사달 기준 문서 8개 읽기와 렌즈 광학·카탈로그 검사를 실행해 통과했다. 렌즈 GPU·브라우저 검사나 실제 앱 전체 검사를 새로 통과한 것으로 확대하지 않는다.
+
+## Node 24 실행 경로 · 실제 Claude 확인 후 수정 (2026-11-06)
+
+Claude의 기본 Bash 명령에서는 BASH_ENV가 설정돼도 Node 22가 우선될 수 있다. MoHo 새 Cloud 세션에서 이 차이를 확인했고 캐시 Node 24(v24.22.2)를 PATH 앞에 지정한 뒤 두 사이트 전체 빌드가 성공했다. Node·npm·pnpm 명령은 `bash scripts/with-node24.sh <명령> [인자...]`로 실행한다. 이 진입점은 Node 24를 확인하고 지정 명령을 그대로 실행하며, 22로 조용히 대체하지 않는다. 저장소 하위 폴더에서는 진입점 경로를 저장소 루트 기준으로 지정한다. SessionStart 설치도 이미 같은 캐시 경로를 먼저 사용한다.
+
+```bash
+bash scripts/with-node24.sh node --version
+bash scripts/with-node24.sh bash scripts/cloud-setup.sh
+```
+
+## 교차검증 최신 결과
+
+아사달에서 Claude가 Codex의 최신 기록을 읽고 문서 검사를 실행한 뒤 세 문서만 커밋·푸시했다. Codex가 원격 diff를 읽어 소스 무변경과 전달된 결과를 검토했고 아사달 PR #5로 main에 보관했다. 이것은 Git 문서 전달의 양방향 확인이며 Codex 계정 환경 재게시·새 Codex Cloud 실행과 구분한다. MoHo에서는 Node 24를 명시한 전체 빌드가 성공했다. 상세 공통 결과는 [실행 확인 기록](https://github.com/tokyosol1992/tokyosol1992.github.io/blob/main/docs/workspace/VERIFICATION.md)을 따른다.
