@@ -1,4 +1,5 @@
-import { CAMERAS, LENSES, APERTURES, SHUTTERS, ISOS, WHITE_BALANCE, STYLES } from './catalog.js';
+import { CAMERAS, LENSES, CAMERA_GROUPS, LENS_GROUPS, BRANDS, FORMATS, APERTURES, SHUTTERS, ISOS, WHITE_BALANCE, STYLES } from './catalog.js';
+import { PRESETS } from './presets.js';
 import * as O from './optics.js';
 import { getScene, SCENE_LIST } from './scenes.js';
 import { Renderer, cameraBasis } from './gpu/renderer.js';
@@ -12,43 +13,48 @@ const QUALITY = {
   high: { scale: 1, cap: 2400, samples: 96, frames: 48, loupeFrames: 64 },
 };
 
-const state = {
-  cameraId: params.get('camera') || 'ff24',
-  lensId: params.get('lens') || 'n50p',
-  sceneId: params.get('scene') || 'garden',
-  focal: 50, N: 1.2, mode: 'A', ec: 0,
-  shutter: 1 / 250, iso: 100,
-  support: 'stabilized', nd: 0,
-  distance: null, keepFraming: true,
-  focusM: 2, afTracksSubject: true, af: [0, 0],
-  wb: 'auto', style: 'standard', zebra: false,
-  loupeZoom: 1, grid: true,
-  quality: params.get('q') || 'standard',
-  split: 0.5, comparing: false, held: null,
-};
-
 // Setups can be linked: ?camera=ff45&lens=p85&scene=street&f=1.4&t=1/60&iso=3200&mode=M
-{
+function makeState(params) {
   const num = (k) => (params.has(k) ? parseFloat(params.get(k)) : null);
-  if (num('f') != null) state.N = num('f');
-  if (num('focal') != null) state.focal = num('focal');
-  if (['A', 'M', 'MA'].includes(params.get('mode'))) state.mode = params.get('mode');
-  if (params.has('t')) { const v = params.get('t'); state.shutter = v.includes('/') ? 1 / parseFloat(v.split('/')[1]) : parseFloat(v); }
-  if (num('iso') != null) state.iso = num('iso');
-  if (num('ec') != null) state.ec = num('ec');
-  if (num('nd') != null) state.nd = num('nd');
-  if (['tripod', 'stabilized', 'handheld'].includes(params.get('support'))) state.support = params.get('support');
-  if (num('dist') != null) state.distance = num('dist');
-  if (num('zoom') != null) state.loupeZoom = num('zoom');
-  if (params.has('wb')) state.wb = params.get('wb');
-  if (params.has('style')) state.style = params.get('style');
-  if (params.get('keep') === '0') state.keepFraming = false;
-  if (params.get('zebra') === '1') state.zebra = true;
-  if (params.get('grid') === '0') state.grid = false;
-  // Manual focus: distance in metres and the AF point (-1 to 1 across the frame).
-  if (num('focus') != null) { state.focusM = num('focus'); state.afTracksSubject = false; }
-  if (params.has('af')) { const a = params.get('af').split(',').map(parseFloat); if (a.length === 2 && a.every(Number.isFinite)) state.af = a; }
+  const st = {
+    cameraId: CAMERAS.some((c) => c.id === params.get('camera')) ? params.get('camera') : 'ff24',
+    lensId: LENSES.some((l) => l.id === params.get('lens')) ? params.get('lens') : 'n50p',
+    sceneId: SCENE_LIST.some((x) => x.id === params.get('scene')) ? params.get('scene') : 'garden',
+    focal: 50, N: 1.2, mode: 'A', ec: 0,
+    shutter: 1 / 250, iso: 100,
+    support: 'stabilized', nd: 0,
+    distance: null, keepFraming: true,
+    focusM: 2, afTracksSubject: true, af: [0, 0],
+    wb: 'auto', style: 'standard', zebra: false,
+    loupeZoom: 1, grid: true,
+    quality: params.get('q') || 'standard',
+    split: 0.5, comparing: false, held: null,
+  };
+  Object.assign(st, getScene(st.sceneId).defaults || {});
+  if (num('f') != null) st.N = num('f');
+  if (num('focal') != null) st.focal = num('focal');
+  if (['A', 'M', 'MA'].includes(params.get('mode'))) st.mode = params.get('mode');
+  if (params.has('t')) { const v = params.get('t'); st.shutter = v.includes('/') ? 1 / parseFloat(v.split('/')[1]) : parseFloat(v); }
+  if (num('iso') != null) st.iso = num('iso');
+  if (num('ec') != null) st.ec = num('ec');
+  if (num('nd') != null) st.nd = num('nd');
+  if (['tripod', 'stabilized', 'handheld'].includes(params.get('support'))) st.support = params.get('support');
+  if (num('dist') != null) st.distance = num('dist');
+  if (params.get('keep') === '0') st.keepFraming = false;
+  if (num('zoom') != null) st.loupeZoom = num('zoom');
+  if (![1, 2, 4].includes(st.loupeZoom)) st.loupeZoom = 1;
+  if (params.get('zebra') === '1') st.zebra = true;
+  if (params.get('grid') === '0') st.grid = false;
+  if (num('focus') != null) { st.focusM = num('focus'); st.afTracksSubject = false; }
+  if (params.has('af')) {
+    const point = params.get('af').split(',').map(parseFloat);
+    if (point.length === 2 && point.every(Number.isFinite)) st.af = point;
+  }
+  if (WHITE_BALANCE.some((w) => w.id === params.get('wb'))) st.wb = params.get('wb');
+  if (STYLES.some((x) => x.id === params.get('style'))) st.style = params.get('style');
+  return st;
 }
+const state = makeState(params);
 
 let renderer = null;
 let shot = null;
@@ -78,13 +84,6 @@ const SCENE_BASE = { iso: 100, support: 'stabilized' };
 function applySceneDefaults(prev, next) {
   if (prev?.defaults || next.defaults) Object.assign(state, SCENE_BASE, next.defaults || {});
 }
-{
-  const d = scene().defaults;
-  if (d) {
-    if (!params.has('iso') && d.iso) state.iso = d.iso;
-    if (!params.has('support') && d.support) state.support = d.support;
-  }
-}
 
 // --- Formatting -----------------------------------------------------------------------
 const fmtN = (n) => (n < 10 ? n.toFixed(1).replace(/\.0$/, '') : Math.round(n).toString());
@@ -101,20 +100,79 @@ function fmtDist(m) {
 const fmtEV = (e) => (e >= 0 ? '+' : '−') + Math.abs(e).toFixed(1);
 
 // --- Populate controls (re-run when the language changes) ---------------------------------
-function fillSelect(el, items, value) {
-  const opt = (it) => `<option value="${it.id}">${loc(it)}</option>`;
-  const products = items.filter((it) => it.kind === 'product');
-  // Real products are listed under their own heading, after the product classes.
-  el.innerHTML = products.length
-    ? `<optgroup label="${t('catalog.classes')}">${items.filter((it) => it.kind !== 'product').map(opt).join('')}</optgroup>`
-      + `<optgroup label="${t('catalog.products')}">${products.map(opt).join('')}</optgroup>`
+function fillSelect(el, items, value, groups, label = loc) {
+  const opt = (it) => `<option value="${it.id}">${label(it)}</option>`;
+  el.innerHTML = groups
+    ? groups.map((g) => {
+      const members = items.filter((it) => it.group === g.id);
+      return members.length ? `<optgroup label="${loc(g)}">${members.map(opt).join('')}</optgroup>` : '';
+    }).join('')
     : items.map(opt).join('');
   el.value = value;
 }
+// --- Lens browser: brand, view (full-frame equivalent) and sensor-fit filters ----------------
+const VIEWS = [
+  { id: 'all', min: 0, max: Infinity },
+  { id: 'uw', min: 0, max: 23.99 },
+  { id: 'wide', min: 24, max: 39.99 },
+  { id: 'std', min: 40, max: 69.99 },
+  { id: 'portrait', min: 70, max: 135.99 },
+  { id: 'tele', min: 136, max: Infinity },
+];
+const ui = { brand: 'all', view: 'all', fits: false };
+// Equivalent field of view depends on the selected camera, not the lens's native format.
+const eqRange = (l) => { const c = O.cropFactor(camera()); return [l.focal[0] * c, l.focal[1] * c]; };
+function lensMatches(l) {
+  const v = VIEWS.find((x) => x.id === ui.view), [a, b] = eqRange(l);
+  return (!l.legacy || l.id === state.lensId) && (ui.brand === 'all' || l.brand === ui.brand)
+    && (!ui.fits || O.lensCovers(l, camera())) && b >= v.min && a <= v.max;
+}
+// Lens names carry their full-frame equivalent and a marker when the lens does not cover the sensor.
+function lensLabel(l) {
+  const [a, b] = eqRange(l);
+  const eq = ` · ${t('lens.eq', { eq: a === b ? Math.round(a) : `${Math.round(a)}–${Math.round(b)}` })}`;
+  return `${loc(l)}${eq}${O.lensCovers(l, camera()) ? '' : ` · ${t('lens.optVignette')}`}`;
+}
+function fillLenses() {
+  const list = LENSES.filter(lensMatches);
+  const shown = list.length ? list : [lens()];
+  fillSelect($('lens'), shown, state.lensId, ui.brand === 'all' ? LENS_GROUPS : null, lensLabel);
+  $('lens-count').textContent = list.length ? t(list.length === 1 ? 'lens.count1' : 'lens.count', { n: list.length }) : t('lens.none');
+}
+// Move to the lens in the filtered list whose view is closest to the current framing.
+function nearestLens() {
+  const list = LENSES.filter(lensMatches);
+  if (!list.length || list.some((l) => l.id === state.lensId)) return null;
+  const now = state.focal * O.cropFactor(camera());
+  const dist = (l) => { const [a, b] = eqRange(l); const e = Math.min(b, Math.max(a, now)); return Math.abs(Math.log(e / now)); };
+  return list.reduce((best, l) => (dist(l) < dist(best) ? l : best));
+}
+function chooseLens(id) {
+  const focal = state.focal;
+  state.lensId = id; activePreset = null;
+  const ln = lens();
+  // Keep the same equivalent view when switching between lenses.
+  state.focal = ln.focal[0] === ln.focal[1] ? ln.focal[0] : clamp(focal, ln.focal[0], ln.focal[1]);
+  state.N = O.maxApertureAt(ln, state.focal);
+  $('lens').dataset.cam = '';
+  updateLook();
+  schedule();
+}
+function fillBrandControls() {
+  const count = (id) => LENSES.filter((l) => !l.legacy && l.brand === id).length;
+  const total = LENSES.filter((l) => !l.legacy).length;
+  $('brand').innerHTML = `<option value="all">${t('brand.all')} (${total})</option>` + BRANDS.map((b) => `<option value="${b.id}">${loc(b)} (${count(b.id)})</option>`).join('');
+  $('brand').value = ui.brand;
+  $('views').innerHTML = VIEWS.map((v) => `<button type="button" class="chip" data-view="${v.id}" aria-pressed="${ui.view === v.id}">${t('view.' + v.id)}</button>`).join('');
+  $('fits').checked = ui.fits;
+}
+
 function renderLabels() {
   applyStatic();
-  fillSelect($('camera'), CAMERAS, state.cameraId);
-  fillSelect($('lens'), LENSES, state.lensId);
+  fillSelect($('camera'), CAMERAS.filter((c) => !c.legacy || c.id === state.cameraId), state.cameraId, CAMERA_GROUPS);
+  fillBrandControls();
+  fillLenses();
+  $('presets').innerHTML = PRESETS.map((p) => `<button type="button" class="chip" data-preset="${p.id}" id="preset-${p.id}">${loc(p)}</button>`).join('');
   fillSelect($('wb'), WHITE_BALANCE, state.wb);
   fillSelect($('style'), STYLES, state.style);
   $('scenes').innerHTML = SCENE_LIST.map((s) => `<button type="button" class="chip" data-scene="${s.id}" id="scene-${s.id}">${loc(s)}</button>`).join('');
@@ -228,6 +286,7 @@ function update() {
   if (renderer) renderer.setShot(shot);
   lastUI = [cam, ln, sc, res];
   renderUI(cam, ln, sc, res);
+  scheduleUrlSync();
 }
 
 function motionFrames(pxOut, base, max) {
@@ -322,16 +381,36 @@ function isoList(cam) { return ISOS.filter((i) => i >= Math.min(cam.baseISO, 100
 
 function renderUI(cam, ln, sc, r) {
   // Selections
-  $('camera').value = cam.id; $('lens').value = ln.id;
+  $('camera').value = cam.id;
+  if ($('lens').dataset.cam !== cam.id + getLang()) { fillLenses(); $('lens').dataset.cam = cam.id + getLang(); }
+  const matching = LENSES.filter(lensMatches);
+  if (matching.length && !matching.some((l) => l.id === ln.id) && (ui.brand !== 'all' || ui.view !== 'all' || ui.fits)) {
+    Object.assign(ui, { brand: 'all', view: 'all', fits: false }); fillBrandControls(); fillLenses();
+  }
+  $('lens').value = ln.id;
   document.querySelectorAll('[data-scene]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scene === sc.id)));
   document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
   document.querySelectorAll('[data-support]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.support === state.support)));
   document.querySelectorAll('[data-nd]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.nd === state.nd)));
   document.querySelectorAll('[data-zoom]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.zoom === state.loupeZoom)));
-  $('lens-note').textContent = loc(ln, 'note') + (ln.kind === 'product' ? ' ' + t('lens.estimated') : '');
+  $('lens-note').textContent = loc(ln, 'note') + (ln.legacy ? ' ' + t('lens.estimated') : '');
+  {
+    const covers = O.lensCovers(ln, cam);
+    const m = fmtDist(ln.minFocus);
+    const spec = ln.focal[0] === ln.focal[1]
+      ? t('lens.specFixed', { f: ln.focal[0], n: fmtN(ln.maxN[0]), m })
+      : t('lens.specZoom', { f1: ln.focal[0], f2: ln.focal[1], n1: fmtN(ln.maxN[0]), n2: fmtN(ln.maxN[1]), m });
+    const el = $('lens-spec');
+    const fmtName = loc(FORMATS[ln.format], 'label');
+    const meta = ln.brand === 'generic' ? t('lens.metaGeneric', { fmt: fmtName }) : t('lens.meta', { brand: loc(BRANDS.find((x) => x.id === ln.brand)), mount: ln.mount, fmt: fmtName });
+    el.textContent = `${meta} · ${spec} · ${t('lens.blades', { b: ln.blades })} · ${t(covers ? 'lens.covers' : 'lens.vignettes')}`;
+    $('lens-est').textContent = ln.legacy ? '' : t(ln.est ? 'lens.est' : 'lens.noteClass');
+    el.classList.toggle('bad', !covers);
+  }
+  document.querySelectorAll('[data-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === activePreset)));
   $('scene-note').textContent = loc(sc, 'blurb');
   $('cam-spec').textContent = t('cam.spec', {
-    w: cam.sensor[0], h: cam.sensor[1], mp: O.megapixels(cam).toFixed(0),
+    w: cam.sensor[0], h: cam.sensor[1], mp: O.megapixels(cam).toFixed(0), c: O.cropFactor(cam).toFixed(2),
     p: (O.pixelPitchMM(cam) * 1000).toFixed(2), aa: t(cam.aa ? 'cam.aa' : 'cam.noAa'),
   }) + (cam.kind === 'product' ? ' ' + t('cam.estimated') : '');
 
@@ -516,18 +595,92 @@ function positionOverlay() {
   if (state.comparing && shot) $('live-desc').textContent = describeSetup(camera().short, lens(), shot.N, shot.t, shot.iso);
 }
 
+// --- Shareable setup --------------------------------------------------------------------------
+// The page keeps the current setup in its address, so a reload or a copied link reopens it.
+let activePreset = null;
+const MANAGED = ['camera', 'lens', 'scene', 'focal', 'f', 't', 'iso', 'mode', 'ec', 'nd', 'support', 'dist', 'keep', 'zoom', 'wb', 'style', 'zebra', 'grid', 'focus', 'af', 'q'];
+function shutterParam(tm) { return tm < 0.3 ? '1/' + Math.round(1 / tm) : String(+tm.toFixed(2)); }
+function setupParams(keepExtras) {
+  const p = new URLSearchParams(keepExtras ? location.search : '');
+  MANAGED.forEach((k) => p.delete(k));
+  const ln = lens();
+  p.set('camera', state.cameraId); p.set('lens', state.lensId); p.set('scene', state.sceneId);
+  if (ln.focal[0] !== ln.focal[1]) p.set('focal', String(Math.round(state.focal)));
+  p.set('f', String(+state.N.toFixed(2))); p.set('mode', state.mode);
+  if (state.mode !== 'A') p.set('t', shutterParam(state.shutter));
+  if (state.mode !== 'MA') p.set('iso', String(Math.round(state.iso)));
+  if (state.mode !== 'M') p.set('ec', String(+state.ec.toFixed(2)));
+  if (state.nd) p.set('nd', String(state.nd));
+  p.set('support', state.support);
+  if (state.distance != null) p.set('dist', state.distance.toFixed(2));
+  if (!state.keepFraming) p.set('keep', '0');
+  if (state.loupeZoom !== 1) p.set('zoom', String(state.loupeZoom));
+  if (state.wb !== 'auto') p.set('wb', state.wb);
+  if (state.style !== 'standard') p.set('style', state.style);
+  if (state.zebra) p.set('zebra', '1');
+  if (!state.grid) p.set('grid', '0');
+  if (!state.afTracksSubject) {
+    p.set('focus', String(+state.focusM.toFixed(3)));
+    p.set('af', state.af.map((v) => +v.toFixed(3)).join(','));
+  }
+  if (state.quality !== 'standard') p.set('q', state.quality);
+  return p;
+}
+let urlTimer = 0;
+function scheduleUrlSync() {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => {
+    try { history.replaceState(null, '', '?' + setupParams(true).toString()); } catch { /* sandboxed frame */ }
+  }, 250);
+}
+function updateLook() {
+  const p = PRESETS.find((x) => x.id === activePreset);
+  $('preset-look').textContent = p ? t('start.look', { text: loc(p, 'look') }) : t('start.note');
+}
+// Replace the whole setup (quick start or reset) and re-render.
+function applySetup(query, presetId = null) {
+  const keep = { quality: state.quality };
+  const next = makeState(new URLSearchParams(query));
+  clearHold();
+  Object.assign(state, next, keep, { comparing: false, held: null });
+  activePreset = presetId;
+  lastFEq = null;
+  if (renderer) renderer.setScene(scene());
+  fillSelect($('camera'), CAMERAS.filter((c) => !c.legacy || c.id === state.cameraId), state.cameraId, CAMERA_GROUPS);
+  $('lens').dataset.cam = '';
+  schedule();
+}
+
 // --- Events ---------------------------------------------------------------------------------------
 let queued = false;
 function schedule() { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; update(); }); } }
 
-$('camera').addEventListener('change', (e) => { state.cameraId = e.target.value; schedule(); });
-$('lens').addEventListener('change', (e) => {
-  const prev = lens();
-  state.lensId = e.target.value;
-  const ln = lens();
-  if (ln.focal[0] !== prev.focal[0] || ln.focal[1] !== prev.focal[1]) state.focal = ln.focal[0] === ln.focal[1] ? ln.focal[0] : clamp(state.focal, ln.focal[0], ln.focal[1]);
-  state.N = O.maxApertureAt(ln, state.focal);
-  schedule();
+$('camera').addEventListener('change', (e) => {
+  state.cameraId = e.target.value; activePreset = null;
+  fillSelect($('camera'), CAMERAS.filter((c) => !c.legacy || c.id === state.cameraId), state.cameraId, CAMERA_GROUPS);
+  onFilter(); updateLook();
+});
+$('presets').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-preset]');
+  if (!b) return;
+  const p = PRESETS.find((x) => x.id === b.dataset.preset);
+  applySetup(p.q, p.id);
+  updateLook();
+});
+$('lens').addEventListener('change', (e) => chooseLens(e.target.value));
+function onFilter() {
+  const next = nearestLens();
+  if (next) chooseLens(next.id); else { fillLenses(); schedule(); }
+  fillLenses();
+}
+$('brand').addEventListener('change', (e) => { ui.brand = e.target.value; onFilter(); });
+$('fits').addEventListener('change', (e) => { ui.fits = e.target.checked; onFilter(); });
+$('views').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-view]');
+  if (!b) return;
+  ui.view = b.dataset.view;
+  document.querySelectorAll('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === ui.view)));
+  onFilter();
 });
 $('focal').addEventListener('input', (e) => { state.focal = +e.target.value; schedule(); });
 $('scenes').addEventListener('click', (e) => {
@@ -655,31 +808,9 @@ function clearHold() {
 $('hold').addEventListener('click', holdA);
 $('hold-chip').addEventListener('click', () => (state.comparing ? clearHold() : holdA()));
 // --- Share link and reset -------------------------------------------------------------------------
-function shutterParam(t) { return t >= 0.3 ? String(+t.toFixed(2)) : '1/' + Math.round(1 / t); }
-// Everything that defines the picture, so the link reopens exactly this setup. Language is left out:
-// the person who opens it sees their own.
+// Use the same complete picture state for the copied link and address-bar restoration.
 function shareURL() {
-  const p = new URLSearchParams();
-  const ln = lens();
-  p.set('camera', state.cameraId); p.set('lens', state.lensId); p.set('scene', state.sceneId);
-  if (ln.focal[0] !== ln.focal[1]) p.set('focal', String(Math.round(state.focal)));
-  p.set('mode', state.mode);
-  p.set('f', String(+state.N.toFixed(2)));
-  if (state.mode !== 'MA') p.set('iso', String(Math.round(state.iso)));
-  if (state.mode !== 'A') p.set('t', shutterParam(state.shutter));
-  if (state.mode !== 'M') p.set('ec', String(+state.ec.toFixed(2)));
-  if (state.nd) p.set('nd', String(state.nd));
-  p.set('support', state.support);
-  p.set('dist', String(+state.distance.toFixed(2)));
-  if (!state.keepFraming) p.set('keep', '0');
-  if (state.loupeZoom !== 1) p.set('zoom', String(state.loupeZoom));
-  if (state.wb !== 'auto') p.set('wb', state.wb);
-  if (state.style !== 'standard') p.set('style', state.style);
-  if (state.zebra) p.set('zebra', '1');
-  if (!state.grid) p.set('grid', '0');
-  if (!state.afTracksSubject) { p.set('focus', String(+state.focusM.toFixed(3))); p.set('af', state.af.map((v) => +v.toFixed(3)).join(',')); }
-  if (state.quality !== 'standard') p.set('q', state.quality);
-  return `${location.origin}${location.pathname}?${p}`;
+  return `${location.origin}${location.pathname}?${setupParams(false)}`;
 }
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; } catch { /* fall back to a hidden field */ }
@@ -714,6 +845,7 @@ document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('clic
   if (b.dataset.lang === getLang()) return;
   setLang(b.dataset.lang);
   renderLabels();
+  updateLook();
   if (lastUI) renderUI(...lastUI);
   if (document.body.dataset.state === 'ready') $('status').textContent = t('status.ready');
 }));

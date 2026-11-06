@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
 <title>Lens View Simulator</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Pick a camera, a lens and a location and see the photograph it would make: framing, focus, bokeh, flare, distortion, diffraction and sensor noise, rendered live with WebGPU.">
@@ -218,7 +219,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .controls { display: grid; gap: 16px; min-width: 0; }
 .group { background: var(--s1); border-radius: var(--r-xl); padding: 20px; display: grid; gap: 16px; min-width: 0; }
 .group > h2 { margin-bottom: 0; }
-label.field { display: grid; gap: 6px; }
+.field { display: grid; gap: 6px; }
 .field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--tx3); }
 .field-label output, .val { font-size: 16px; line-height: 22px; font-weight: 700; color: var(--blue-text); }
 .is-auto .val::after { content: var(--auto-label); color: var(--tx3); font-weight: 500; font-size: 13px; }
@@ -228,6 +229,10 @@ label.field { display: grid; gap: 6px; }
 .chip { min-height: 52px; padding: 10px 14px; border: 0; border-radius: var(--r-md); background: var(--s2); color: var(--tx2); font-size: 14px; line-height: 19px; font-weight: 500; text-align: left; cursor: pointer; transition: transform 0.12s ease-out, background-color 0.15s; }
 .chip:active { transform: scale(0.97); }
 .chip[aria-pressed="true"] { background: var(--blue-tint); color: var(--blue-text); font-weight: 600; }
+.lens-spec.bad { color: var(--bad); }
+.quick-starts summary { cursor: pointer; font-size: 15px; font-weight: 600; }
+.quick-starts[open] summary { margin-bottom: 12px; }
+.quick-starts .note { margin-top: 10px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .focus-line { display: grid; gap: 12px; }
 .tabs { display: none; }
@@ -405,10 +410,21 @@ label.field { display: grid; gap: 6px; }
   <aside class="controls" aria-label="Camera settings" data-i18n-aria="aria.controls">
     <section class="group" data-panel="gear">
       <h2 data-i18n="group.gear">Gear</h2>
+      <details class="quick-starts">
+        <summary data-i18n="group.start">Quick starts</summary>
+        <div class="chips" id="presets"></div>
+        <p class="note" id="preset-look" data-i18n="start.note">One click sets up a comparison and tells you what to look at.</p>
+      </details>
       <label class="field"><span class="field-label" data-i18n="field.camera">Camera body</span><select id="camera"></select></label>
       <p class="note" id="cam-spec"></p>
-      <label class="field"><span class="field-label" data-i18n="field.lens">Lens</span><select id="lens"></select></label>
+      <label class="field"><span class="field-label" data-i18n="field.brand">Brand</span><select id="brand"></select></label>
+      <div class="field"><span class="field-label" data-i18n="field.view">View (full-frame equivalent)</span><div class="chips" id="views" role="group" aria-label="View (full-frame equivalent)" data-i18n-aria="field.view"></div></div>
+      <label class="check"><input type="checkbox" id="fits"> <span data-i18n="field.fits">Only lenses that cover this sensor</span></label>
+      <p class="note" data-i18n="lens.mountNote">Coverage does not check mount compatibility.</p>
+      <label class="field"><span class="field-label"><span data-i18n="field.lens">Lens</span> <output id="lens-count"></output></span><select id="lens"></select></label>
+      <p class="note lens-spec" id="lens-spec"></p>
       <p class="note" id="lens-note"></p>
+      <p class="note" id="lens-est"></p>
       <label class="field" id="focal-row"><span class="field-label"><span data-i18n="field.focal">Focal length</span> <output id="focal-val"></output></span><input type="range" id="focal" step="1"></label>
     </section>
 

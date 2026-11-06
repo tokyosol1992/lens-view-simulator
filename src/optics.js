@@ -179,3 +179,6 @@ export function resolveShot(cam, lens, scene, s) {
     diag,
   };
 }
+
+// Does the lens's image circle cover the whole sensor? (Same test as the dark-corner warning.)
+export function lensCovers(lens, cam) { return lens.imageCircle >= sensorDiag(cam) * 0.995; }

@@ -6,7 +6,9 @@ The interface is available in English and Korean. The **EN / 한국어** switch 
 
 On wide screens the picture, focus scale, loupe and readouts are on the left and the settings are in a column on the right. On phones and narrow windows the picture, the focus scale and a tab bar stay pinned to the top, and the tabs (**Gear, Location, Exposure, Picture, Results**) choose which panel scrolls beneath them, so every change can be seen as it is made. A **Hold as A** chip over the picture starts a comparison without leaving the settings.
 
-**Copy link** (with **Reset settings**, under Picture) copies a link that reopens exactly this setup: gear, location, exposure, focus point and picture settings. A link that names something this version does not have still opens, with defaults. **Reset settings** puts exposure, focus and picture settings back to the start and keeps the gear, the location and a held A.
+The **Gear** panel includes seven quick starts and a lens browser. Filter by brand, full-frame-equivalent view on the selected camera, and whether the lens image circle covers its sensor. Coverage does not check whether the lens mount actually fits the camera.
+
+**Copy link** (with **Reset settings**, under Picture) copies a link that reopens the setup: gear, location, exposure, focus point and picture settings. The address bar also follows those settings, so a reload restores them. A link that names something this version does not have still opens, with defaults. **Reset settings** puts exposure, focus and picture settings back to the start and keeps the gear, the location and a held A.
 
 The look follows a flat, one-accent style: surfaces step in lightness instead of using borders, blue is the only accent, controls are large, and the font is [Pretendard](https://github.com/orioncactus/pretendard) (SIL OFL), loaded from jsDelivr with Noto Sans KR and the system Korean font as fallbacks. Dark and light follow the system setting.
 
@@ -64,7 +66,9 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | Path | Contents |
 | --- | --- |
 | `index.html` | Page, layout and styles |
-| `src/catalog.js` | Camera bodies and lenses (product classes and real products), dial scales, white balance, picture styles |
+| `src/catalog.js` | Camera bodies, generic lenses and legacy product links, dial scales, white balance, picture styles |
+| `src/lenses-brands.js` | Brand lens data, formats and class-based optical estimates |
+| `src/presets.js` | Quick starts and what to look for, in English and Korean |
 | `src/optics.js` | Camera maths: FOV, DOF, hyperfocal, exposure, diffraction, noise, shake |
 | `src/scenes.js` | The five locations |
 | `src/main.js` | UI state, per-view camera parameters, readouts, focus scale, A/B |
@@ -78,6 +82,7 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `tools/share-check.mjs` | Checks that a copied link reopens the same setup (four setups, round trip), that unknown ids fall back to defaults, that Copy link reaches the clipboard, and that Reset restores the starting settings |
 | `tools/catalog-check.mjs` | Checks the catalog: every field present, unique ids, pixel counts match the sensor shape, real products marked and translated |
 | `tools/layout-check.mjs` | Checks the responsive layout without a GPU, at phone, tablet and desktop widths in both languages: no overflow, header not overlapping, picture and tabs pinned on narrow screens, one panel per tab, loupe keeps its size. `FONT_DIR=<pretendard folder>` measures with the real font offline |
+| `tools/flow-check.mjs` | Checks catalog filters, camera-dependent equivalent view, quick starts, older links, manual-focus restoration and the phone gear tab without a GPU |
 | `tools/interact.mjs` | Clicks to focus, holds A, refocuses and switches lens in headless Chromium |
 | `tools/shoot.mjs` | Renders setups headlessly and saves screenshots, e.g. `node tools/shoot.mjs out "scene=street&lens=p85&q=draft"` |
 
@@ -85,14 +90,11 @@ A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids 
 
 ## Products
 
-The first entries in each list are product *classes* (for example "Full frame 24 MP" or "85mm f/1.4 portrait") with typical values. The entries under **Real products** are specific models:
+The camera picker offers 15 sensor classes from 1-inch to 645. The lens picker offers 100 mirrorless brand models from Sony, Nikon, Canon, Fujifilm, Panasonic, OM System, Sigma, Tamron and Viltrox, plus 27 generic lens classes. Old links to the six previously available real camera models, the phone sensor and nine original real-lens IDs still open; those entries are hidden from the normal pickers unless selected by a link.
 
-- Cameras: Sony α7 IV, Canon EOS R5, Nikon Z8, OM System OM-1, Fujifilm X-T5, Fujifilm GFX100 II.
-- Lenses: Canon RF 50mm F1.2 L USM, Sigma 35mm F1.4 DG DN Art, Sony FE 24mm F1.4 GM, Sony FE 14mm F1.8 GM, Nikon NIKKOR Z 50mm f/1.8 S, Sony FE 100mm F2.8 STF GM OSS, Sony FE 90mm F2.8 Macro G OSS, Fujifilm XF 23mm F1.4 R LM WR, Fujifilm GF 110mm F2 R LM WR.
+For the original real camera and lens entries, published figures were checked against maker or retailer listings on 2026-11-04; the GFX100 II ISO range and stabilisation, several low-pass filters and OM-1 image size still need the checks described in the prior catalog notes. The expanded brand rows include focal length and maximum aperture; some closest-focus distances and blade counts remain unverified. Minimum aperture, transmission and optical character may be class-derived estimates. Distortion, aberrations, softness, flare, coma and sensor noise are **not measurements of each product**. Check the manufacturer's specifications before relying on them. The Sony STF's f/2.8 is T5.6.
 
-For these, the makers' own figures are used where they publish them: sensor size, pixel count, ISO range and stabilisation for bodies, and focal length, aperture range, blade count, closest focus and any T-stop for lenses (the STF's f/2.8 is T5.6, so it loses two stops). They were checked against maker or retailer spec listings on 2026-11-04. Where sources disagreed, the product was left out. Makers do not publish distortion, aberrations, softness, flare or sensor noise, so those values are copied from the nearest class (`basedOn` in `src/catalog.js`) and are **estimates, not measurements**; the page says so under the dropdowns. Please check these against the maker's page before relying on them: the GFX100 II's ISO range and stabilisation (from retailer listings), the low-pass filter of the α7 IV and the Fujifilm bodies (assumed), and the OM-1's image size (derived from 20.4 MP at 4:3). Lens mounts are not modelled, so any lens can be combined with any body; a lens that does not cover the sensor shows dark corners.
-
-To add a product, give `cameraFrom(baseClassId, { ... })` or `lensFrom(baseClassId, { ... })` the maker's figures and a `ko: { name, note }` for the Korean interface. To add a class entry, write a full object in `CAMERAS` or `LENSES`; the comments in `src/catalog.js` describe each field. Lab-measured optical values are better than class estimates when you have them. `node tools/catalog-check.mjs` checks that every field is present, ids are unique and pixel counts match the sensor's shape.
+Brand rows are in `src/lenses-brands.js`; sensor classes and compatibility entries are in `src/catalog.js`. When adding or correcting a product, record the source and date, distinguish estimates from measured values, and run `node tools/catalog-check.mjs` and `node tools/check-optics.mjs`. A lens that does not cover the selected sensor shows dark corners. Mount names are informational and do not restrict combinations.
 
 ## Limits
 
