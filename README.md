@@ -100,3 +100,9 @@ To add a product, give `cameraFrom(baseClassId, { ... })` or `lensFrom(baseClass
 - Defocus is post-processed from one viewpoint, so a blurred foreground cannot reveal what is hidden behind it.
 - Ghosts are generic reflections mirrored through the centre, not lens-specific ghost shapes.
 - Headless Chromium in some containers cannot present a WebGPU canvas. `tools/shoot.mjs` therefore reads the frames back from the GPU and overlays them for screenshots.
+
+## Cloud development and handoff
+
+Use this repository for both Codex and Claude Code. Read [AGENTS.md](AGENTS.md), [STATUS.md](STATUS.md), [DECISIONS.md](DECISIONS.md), [HISTORY.md](HISTORY.md), and [CLOUD_HANDOFF.md](CLOUD_HANDOFF.md) when starting or switching AI platforms. Node 24 and Python 3 are used for development checks; the deployed page remains static with no application dependency or build step.
+
+Run `bash scripts/cloud-setup.sh` for optics and catalog checks. Browser/WebGPU checks are separate. Claude has a repository-bound **렌즈 시뮬레이터** environment; account configuration and a successful runtime test are reported separately.
