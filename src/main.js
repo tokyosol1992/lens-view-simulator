@@ -13,9 +13,25 @@ const QUALITY = {
   high: { scale: 1, cap: 2400, samples: 96, frames: 48, loupeFrames: 64 },
 };
 
+function parseShutter(text) {
+  const match = String(text).trim().match(/^(\d+(?:\.\d+)?|\.\d+)(?:\s*\/\s*(\d+(?:\.\d+)?|\.\d+))?\s*(?:s|sec|초|″|")?$/i);
+  if (!match) return null;
+  const numerator = Number(match[1]), denominator = match[2] ? Number(match[2]) : 1;
+  const seconds = numerator / denominator;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+function frameSlot(params, index) {
+  const selected = LENSES.find((item) => item.id === params.get('cmp' + index));
+  if (!selected) return { lensId: '', focal: null };
+  const requested = parseFloat(params.get('cmp' + index + 'f'));
+  const focal = Number.isFinite(requested) ? requested : selected.focal[0];
+  return { lensId: selected.id, focal: Math.min(selected.focal[1], Math.max(selected.focal[0], focal)) };
+}
+
 // Setups can be linked: ?camera=ff45&lens=p85&scene=street&f=1.4&t=1/60&iso=3200&mode=M
 function makeState(params) {
-  const num = (k) => (params.has(k) ? parseFloat(params.get(k)) : null);
+  const num = (k) => { const v = params.has(k) ? parseFloat(params.get(k)) : NaN; return Number.isFinite(v) ? v : null; };
   const st = {
     cameraId: CAMERAS.some((c) => c.id === params.get('camera')) ? params.get('camera') : 'ff24',
     lensId: LENSES.some((l) => l.id === params.get('lens')) ? params.get('lens') : 'n50p',
@@ -29,12 +45,13 @@ function makeState(params) {
     loupeZoom: 1, grid: true,
     quality: params.get('q') || 'standard',
     split: 0.5, comparing: false, held: null,
+    frameLenses: [frameSlot(params, 1), frameSlot(params, 2)],
   };
   Object.assign(st, getScene(st.sceneId).defaults || {});
   if (num('f') != null) st.N = num('f');
   if (num('focal') != null) st.focal = num('focal');
   if (['A', 'M', 'MA'].includes(params.get('mode'))) st.mode = params.get('mode');
-  if (params.has('t')) { const v = params.get('t'); st.shutter = v.includes('/') ? 1 / parseFloat(v.split('/')[1]) : parseFloat(v); }
+  if (params.has('t')) st.shutter = parseShutter(params.get('t')) ?? st.shutter;
   if (num('iso') != null) st.iso = num('iso');
   if (num('ec') != null) st.ec = num('ec');
   if (num('nd') != null) st.nd = num('nd');
@@ -60,6 +77,8 @@ let renderer = null;
 let shot = null;
 let lastFEq = null;
 let lastUI = null;
+let frameGeometry = null;
+let frameControlsInitialized = false;
 
 const norm3 = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); };
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -69,6 +88,18 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const camera = () => CAMERAS.find((c) => c.id === state.cameraId);
 const lens = () => LENSES.find((l) => l.id === state.lensId);
 const scene = () => getScene(state.sceneId);
+const comparisonLens = (slot) => LENSES.find((item) => item.id === slot.lensId);
+
+function compareGeometry(res) {
+  const entries = state.frameLenses.map((slot) => {
+    const selected = comparisonLens(slot);
+    if (!selected) return null;
+    const focus = Math.max(res.focusM, selected.minFocus);
+    return { lens: selected, focal: slot.focal, effective: O.framingFocal(selected, slot.focal, focus) };
+  });
+  return { primary: res.fEff, wide: Math.min(res.fEff, ...entries.filter(Boolean).map((entry) => entry.effective)), entries };
+}
+const previewScale = () => frameGeometry ? frameGeometry.wide / frameGeometry.primary : 1;
 
 // A link can name something this version does not have (a removed product, a typo): fall back rather than fail.
 if (!CAMERAS.some((c) => c.id === state.cameraId)) state.cameraId = 'ff24';
@@ -86,10 +117,13 @@ function applySceneDefaults(prev, next) {
 }
 
 // --- Formatting -----------------------------------------------------------------------
-const fmtN = (n) => (n < 10 ? n.toFixed(1).replace(/\.0$/, '') : Math.round(n).toString());
+const fmtN = (n) => String(+n.toFixed(3));
 function fmtShutter(t) {
-  if (t >= 0.3) return (t >= 10 ? Math.round(t) : +t.toFixed(1)) + '″';
-  return '1/' + Math.round(1 / t);
+  if (t < 0.3) {
+    const denominator = Math.round(1 / t);
+    if (Math.abs(t - 1 / denominator) / t < 0.001) return '1/' + denominator;
+  }
+  return shutterParam(t) + '″';
 }
 function fmtDist(m) {
   if (!isFinite(m) || m > 5000) return '∞';
@@ -97,7 +131,11 @@ function fmtDist(m) {
   if (m < 10) return m.toFixed(2) + ' m';
   return m.toFixed(m < 100 ? 1 : 0) + ' m';
 }
-const fmtEV = (e) => (e >= 0 ? '+' : '−') + Math.abs(e).toFixed(1);
+const fmtEV = (e) => {
+  const value = Math.abs(e).toFixed(3).replace(/0+$/, '').replace(/\.$/, '.0');
+  return (e >= 0 ? '+' : '−') + value;
+};
+const fmtInput = (n) => String(+Number(n).toFixed(3));
 
 // --- Populate controls (re-run when the language changes) ---------------------------------
 function fillSelect(el, items, value, groups, label = loc) {
@@ -167,15 +205,30 @@ function fillBrandControls() {
   $('fits').checked = ui.fits;
 }
 
+function fillFrameControls() {
+  state.frameLenses.forEach((slot, index) => {
+    const el = $('frame-lens-' + (index + 1));
+    const options = LENSES.filter((item) => !item.legacy || item.id === slot.lensId);
+    el.innerHTML = `<option value="">${t('frame.none')}</option>` + LENS_GROUPS.map((group) => {
+      const members = options.filter((item) => item.group === group.id);
+      return members.length ? `<optgroup label="${loc(group)}">${members.map((item) => `<option value="${item.id}">${loc(item)}</option>`).join('')}</optgroup>` : '';
+    }).join('');
+    el.value = slot.lensId;
+  });
+  if (!frameControlsInitialized && state.frameLenses.some((slot) => slot.lensId)) $('frame-settings').open = true;
+  frameControlsInitialized = true;
+}
+
 function renderLabels() {
   applyStatic();
   fillSelect($('camera'), CAMERAS.filter((c) => !c.legacy || c.id === state.cameraId), state.cameraId, CAMERA_GROUPS);
   fillBrandControls();
   fillLenses();
+  fillFrameControls();
   $('presets').innerHTML = PRESETS.map((p) => `<button type="button" class="chip" data-preset="${p.id}" id="preset-${p.id}">${loc(p)}</button>`).join('');
   fillSelect($('wb'), WHITE_BALANCE, state.wb);
   fillSelect($('style'), STYLES, state.style);
-  $('scenes').innerHTML = SCENE_LIST.map((s) => `<button type="button" class="chip" data-scene="${s.id}" id="scene-${s.id}">${loc(s)}</button>`).join('');
+  fillSelect($('scene-select'), SCENE_LIST, state.sceneId);
   syncCompareUI();
 }
 renderLabels();
@@ -245,6 +298,7 @@ function update() {
   state.focusM = res.focusM;
   if (state.mode === 'A') state.shutter = res.t;
   if (state.mode === 'MA') state.iso = res.iso;
+  frameGeometry = compareGeometry(res);
 
   // Subject / AF position in the frame
   const icR = ln.imageCircle / 2;
@@ -266,7 +320,7 @@ function update() {
     ? ln.veil * 0.8 * sc.sun.irradiance * (1 - (sunAngle - halfDiag) / (1.4 - halfDiag)) : 0;
   const stopRatio = Nmax / res.N;
   shot = {
-    ...res, eye, basis,
+    ...res, eye, basis, fEff: frameGeometry.wide,
     imageDist: O.imageDistance(res.f, res.focusM),
     exposureTime: res.t,
     shakePhase: [0.7, 2.1, 4.0, 5.3], tremorHz: O.TREMOR_HZ,
@@ -336,7 +390,7 @@ function updateViews() {
   const zoom = state.loupeZoom;
   const lOutW = Math.ceil(lw / zoom), lOutH = Math.ceil(lw / zoom);
   const p = shot.pitch;
-  let cx = state.af[0] * W / 2, cy = state.af[1] * H / 2;
+  let cx = state.af[0] * previewScale() * W / 2, cy = state.af[1] * previewScale() * H / 2;
   cx = clamp(cx, -W / 2 + lOutW * p / 2, W / 2 - lOutW * p / 2);
   cy = clamp(cy, -H / 2 + lOutH * p / 2, H / 2 - lOutH * p / 2);
   // Snap to the sensor grid so the colour filter phase is stable.
@@ -375,9 +429,61 @@ function apertureList(ln) {
   const Nmax = O.maxApertureAt(ln, state.focal);
   const list = APERTURES.filter((n) => n >= Nmax - 0.05 && n <= ln.minN + 0.01);
   if (!list.length || Math.abs(list[0] - Nmax) > 0.05) list.unshift(+Nmax.toFixed(1));
+  if (state.N >= Nmax && state.N <= ln.minN && !list.some((n) => Math.abs(n - state.N) < 1e-6)) list.push(state.N);
+  list.sort((a, b) => a - b);
   return list;
 }
-function isoList(cam) { return ISOS.filter((i) => i >= Math.min(cam.baseISO, 100) / 2 && i <= cam.maxISO && (i >= cam.baseISO || i >= 50)); }
+function isoList(cam) {
+  const list = ISOS.filter((i) => i >= Math.min(cam.baseISO, 100) / 2 && i <= cam.maxISO && (i >= cam.baseISO || i >= 50));
+  if (state.iso >= list[0] && state.iso <= cam.maxISO && !list.includes(state.iso)) list.push(state.iso);
+  return list.sort((a, b) => a - b);
+}
+function shutterList() {
+  const list = [...SHUTTERS];
+  if (state.shutter >= 1 / 8000 && state.shutter <= 30 && !list.some((entry) => Math.abs(entry[1] - state.shutter) < 1e-9)) {
+    list.push([shutterParam(state.shutter), state.shutter]);
+  }
+  return list.sort((a, b) => b[1] - a[1]);
+}
+function syncInput(id, value, min, max, disabled = false) {
+  const input = $(id);
+  if (input.type === 'number') { input.min = min; input.max = max; }
+  input.disabled = disabled;
+  if (document.activeElement !== input) input.value = value;
+}
+function renderFrames() {
+  const active = frameGeometry.entries.some(Boolean);
+  const lines = $('frame-lines'), legend = $('frame-legend');
+  lines.toggleAttribute('hidden', !active);
+  legend.hidden = !active;
+  state.frameLenses.forEach((slot, index) => {
+    const selected = comparisonLens(slot);
+    $('frame-lens-' + (index + 1)).value = slot.lensId;
+    $('frame-coverage-' + (index + 1)).textContent = selected && !O.lensCovers(selected, camera()) ? t('frame.coverage') : '';
+    syncInput('frame-focal-' + (index + 1), selected ? fmtInput(slot.focal) : '', selected?.focal[0] ?? 0, selected?.focal[1] ?? 0,
+      !selected || selected.focal[0] === selected.focal[1]);
+  });
+  if (!active) { legend.replaceChildren(); return; }
+  const draw = (id, effective) => {
+    const rect = $(id), ratio = frameGeometry.wide / effective, size = 97.6 * ratio;
+    rect.toggleAttribute('hidden', false);
+    rect.setAttribute('x', String((100 - size) / 2)); rect.setAttribute('y', String((100 - size) / 2));
+    rect.setAttribute('width', String(size)); rect.setAttribute('height', String(size));
+  };
+  draw('frame-primary', frameGeometry.primary);
+  ['frame-one', 'frame-two'].forEach((id, index) => {
+    const entry = frameGeometry.entries[index];
+    if (entry) draw(id, entry.effective); else $(id).toggleAttribute('hidden', true);
+  });
+  const labels = [
+    [state.comparing ? 'frame.previewB' : 'frame.preview', {}, ''],
+    ['frame.primary', { f: fmtInput(state.focal) }, 'frame-primary'],
+    ...frameGeometry.entries.map((entry, index) => entry ? ['frame.extra' + (index + 1), { f: fmtInput(entry.focal) }, index ? 'frame-two' : 'frame-one'] : null).filter(Boolean),
+  ];
+  legend.replaceChildren(...labels.map(([key, vars, className]) => {
+    const chip = document.createElement('span'); chip.className = className; chip.textContent = t(key, vars); return chip;
+  }));
+}
 
 function renderUI(cam, ln, sc, r) {
   // Selections
@@ -388,7 +494,7 @@ function renderUI(cam, ln, sc, r) {
     Object.assign(ui, { brand: 'all', view: 'all', fits: false }); fillBrandControls(); fillLenses();
   }
   $('lens').value = ln.id;
-  document.querySelectorAll('[data-scene]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scene === sc.id)));
+  $('scene-select').value = sc.id;
   document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
   document.querySelectorAll('[data-support]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.support === state.support)));
   document.querySelectorAll('[data-nd]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.nd === state.nd)));
@@ -418,18 +524,23 @@ function renderUI(cam, ln, sc, r) {
   const zoomRow = $('focal-row');
   zoomRow.hidden = ln.focal[0] === ln.focal[1];
   $('focal').min = ln.focal[0]; $('focal').max = ln.focal[1]; $('focal').value = r.f;
-  $('focal-val').textContent = `${Math.round(r.f)} mm`;
+  $('focal-val').textContent = `${fmtInput(r.f)} mm`;
+  syncInput('focal-input', fmtInput(r.f), ln.focal[0], ln.focal[1]);
 
   // Exposure dials
   const aps = apertureList(ln);
   setDial('aperture', aps, r.N, (n) => 'f/' + fmtN(n));
-  setDial('shutter', SHUTTERS, r.t, () => fmtShutter(r.t));
+  setDial('shutter', shutterList(), r.t, () => fmtShutter(r.t));
   $('shutter-val').textContent = fmtShutter(r.t);
   const isos = isoList(cam);
   setDial('iso', isos, r.iso, () => Math.round(r.iso).toString());
   $('iso-val').textContent = Math.round(r.iso).toString();
   $('shutter').disabled = state.mode === 'A';
   $('iso').disabled = state.mode === 'MA';
+  syncInput('aperture-input', fmtInput(r.N), O.maxApertureAt(ln, state.focal), ln.minN);
+  syncInput('shutter-input', shutterParam(r.t), 1 / 8000, 30, state.mode === 'A');
+  syncInput('iso-input', String(Math.round(r.iso)), isos[0], cam.maxISO, state.mode === 'MA');
+  syncInput('ec-input', fmtInput(state.ec), -3, 3, state.mode === 'M');
   $('shutter-row').classList.toggle('is-auto', state.mode === 'A');
   $('iso-row').classList.toggle('is-auto', state.mode === 'MA');
   $('ec').value = state.ec; $('ec-val').textContent = fmtEV(state.ec);
@@ -438,9 +549,12 @@ function renderUI(cam, ln, sc, r) {
   // Distance & focus
   $('distance').min = sc.camera.min; $('distance').max = sc.camera.max; $('distance').value = state.distance;
   $('distance-val').textContent = fmtDist(state.distance);
+  syncInput('distance-input', fmtInput(state.distance), sc.camera.min, sc.camera.max);
   $('keep').checked = state.keepFraming;
   $('focus-val').textContent = fmtDist(r.focusM);
+  syncInput('focus-input', fmtInput(r.focusM), ln.minFocus, 10000);
   $('focus-src').textContent = t(state.afTracksSubject ? 'focus.subject' : 'focus.manual');
+  renderFrames();
 
   // Picture
   $('wb').value = state.wb; $('style').value = state.style; $('zebra').checked = state.zebra;
@@ -452,7 +566,7 @@ function renderUI(cam, ln, sc, r) {
   $('vf-aperture').textContent = 'F' + fmtN(r.N);
   $('vf-iso').textContent = 'ISO ' + Math.round(r.iso) + (state.mode === 'MA' ? ' A' : '');
   $('vf-ev').textContent = fmtEV(state.mode === 'M' ? r.evOffset : state.ec);
-  $('vf-focal').textContent = `${Math.round(r.f)}mm`;
+  $('vf-focal').textContent = `${fmtInput(r.f)}mm`;
 
   // Readouts
   const pct = (x) => (x < 1 ? x.toFixed(2) : x.toFixed(1)) + '%';
@@ -573,8 +687,8 @@ function positionOverlay() {
   const vf = $('viewfinder');
   const af = $('af-box');
   const w = vf.clientWidth, h = vf.clientHeight;
-  af.style.left = `${(state.af[0] * 0.5 + 0.5) * w}px`;
-  af.style.top = `${(0.5 - state.af[1] * 0.5) * h}px`;
+  af.style.left = `${(state.af[0] * previewScale() * 0.5 + 0.5) * w}px`;
+  af.style.top = `${(0.5 - state.af[1] * previewScale() * 0.5) * h}px`;
   const cam = camera();
   if (shot) {
     const zoom = state.loupeZoom;
@@ -587,6 +701,8 @@ function positionOverlay() {
   vf.classList.toggle('comparing', state.comparing);
   split.hidden = !state.comparing;
   split.style.left = `${state.split * w}px`;
+  // The outlines describe the live B view, so never draw them over a held A image.
+  $('frame-lines').style.clipPath = state.comparing ? `inset(0 0 0 ${state.split * 100}%)` : '';
   $('ab-labels').hidden = !state.comparing;
   if (state.held) {
     const h = state.held;
@@ -598,21 +714,25 @@ function positionOverlay() {
 // --- Shareable setup --------------------------------------------------------------------------
 // The page keeps the current setup in its address, so a reload or a copied link reopens it.
 let activePreset = null;
-const MANAGED = ['camera', 'lens', 'scene', 'focal', 'f', 't', 'iso', 'mode', 'ec', 'nd', 'support', 'dist', 'keep', 'zoom', 'wb', 'style', 'zebra', 'grid', 'focus', 'af', 'q'];
-function shutterParam(tm) { return tm < 0.3 ? '1/' + Math.round(1 / tm) : String(+tm.toFixed(2)); }
+const MANAGED = ['camera', 'lens', 'scene', 'focal', 'f', 't', 'iso', 'mode', 'ec', 'nd', 'support', 'dist', 'keep', 'zoom', 'wb', 'style', 'zebra', 'grid', 'focus', 'af', 'q', 'cmp1', 'cmp1f', 'cmp2', 'cmp2f'];
+function shutterParam(tm) {
+  if (tm >= 0.3) return String(+tm.toFixed(6));
+  const denominator = Math.round(1 / tm);
+  return Math.abs(tm - 1 / denominator) < 1e-7 ? '1/' + denominator : String(+tm.toFixed(6));
+}
 function setupParams(keepExtras) {
   const p = new URLSearchParams(keepExtras ? location.search : '');
   MANAGED.forEach((k) => p.delete(k));
   const ln = lens();
   p.set('camera', state.cameraId); p.set('lens', state.lensId); p.set('scene', state.sceneId);
-  if (ln.focal[0] !== ln.focal[1]) p.set('focal', String(Math.round(state.focal)));
-  p.set('f', String(+state.N.toFixed(2))); p.set('mode', state.mode);
+  if (ln.focal[0] !== ln.focal[1]) p.set('focal', fmtInput(state.focal));
+  p.set('f', fmtInput(state.N)); p.set('mode', state.mode);
   if (state.mode !== 'A') p.set('t', shutterParam(state.shutter));
   if (state.mode !== 'MA') p.set('iso', String(Math.round(state.iso)));
-  if (state.mode !== 'M') p.set('ec', String(+state.ec.toFixed(2)));
+  if (state.mode !== 'M') p.set('ec', fmtInput(state.ec));
   if (state.nd) p.set('nd', String(state.nd));
   p.set('support', state.support);
-  if (state.distance != null) p.set('dist', state.distance.toFixed(2));
+  if (state.distance != null) p.set('dist', fmtInput(state.distance));
   if (!state.keepFraming) p.set('keep', '0');
   if (state.loupeZoom !== 1) p.set('zoom', String(state.loupeZoom));
   if (state.wb !== 'auto') p.set('wb', state.wb);
@@ -624,6 +744,11 @@ function setupParams(keepExtras) {
     p.set('af', state.af.map((v) => +v.toFixed(3)).join(','));
   }
   if (state.quality !== 'standard') p.set('q', state.quality);
+  state.frameLenses.forEach((slot, index) => {
+    if (!slot.lensId) return;
+    p.set('cmp' + (index + 1), slot.lensId);
+    p.set('cmp' + (index + 1) + 'f', fmtInput(slot.focal));
+  });
   return p;
 }
 let urlTimer = 0;
@@ -655,6 +780,57 @@ function applySetup(query, presetId = null) {
 let queued = false;
 function schedule() { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; update(); }); } }
 
+// The number fields and sliders write the same state. Values outside the available range
+// are clamped and announced; an invalid entry restores the previous value.
+const directInputs = [
+  { id: 'focal-input', read: () => state.focal, bounds: () => lens().focal, write: (v) => { state.focal = v; } },
+  { id: 'distance-input', read: () => state.distance, bounds: () => [scene().camera.min, scene().camera.max], write: (v) => { state.distance = v; lastFEq = null; state.afTracksSubject = true; } },
+  { id: 'focus-input', read: () => state.focusM, bounds: () => [lens().minFocus, 10000], write: (v) => { state.focusM = v; state.afTracksSubject = false; } },
+  { id: 'aperture-input', read: () => state.N, bounds: () => [O.maxApertureAt(lens(), state.focal), lens().minN], write: (v) => { state.N = v; } },
+  { id: 'shutter-input', read: () => state.shutter, bounds: () => [1 / 8000, 30], parse: parseShutter, format: shutterParam, write: (v) => { state.shutter = v; } },
+  { id: 'iso-input', read: () => state.iso, bounds: () => [isoList(camera())[0], camera().maxISO], write: (v) => { state.iso = Math.round(v); } },
+  { id: 'ec-input', read: () => state.ec, bounds: () => [-3, 3], write: (v) => { state.ec = v; } },
+  ...[0, 1].map((index) => ({
+    id: 'frame-focal-' + (index + 1),
+    read: () => state.frameLenses[index].focal,
+    bounds: () => comparisonLens(state.frameLenses[index])?.focal || [0, 0],
+    write: (v) => { state.frameLenses[index].focal = v; clearHold(); },
+  })),
+];
+for (const spec of directInputs) {
+  const input = $(spec.id), feedback = document.createElement('small');
+  feedback.className = 'input-feedback'; feedback.id = spec.id + '-feedback'; feedback.hidden = true;
+  feedback.setAttribute('role', 'status');
+  input.setAttribute('aria-describedby', feedback.id);
+  (input.closest('.field') || input.closest('.strip-col')).append(feedback);
+  const format = spec.format || fmtInput;
+  input.addEventListener('input', () => { feedback.hidden = true; });
+  input.addEventListener('change', () => {
+    const text = input.value.trim();
+    const parsed = text ? (spec.parse ? spec.parse(text) : Number(text)) : null;
+    if (parsed == null || !Number.isFinite(parsed)) {
+      input.value = format(spec.read());
+      feedback.textContent = t(spec.parse ? 'input.invalidShutter' : 'input.invalid');
+      feedback.hidden = false;
+      return;
+    }
+    const [min, max] = spec.bounds();
+    const bounded = clamp(parsed, min, max);
+    const value = spec.parse ? bounded : +bounded.toFixed(3);
+    spec.write(value);
+    input.value = format(spec.read());
+    if (bounded !== parsed) {
+      feedback.textContent = t('input.clamped', { min: format(min), max: format(max) });
+      feedback.hidden = false;
+    } else feedback.hidden = true;
+    schedule();
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); input.blur(); }
+    if (event.key === 'Escape') { input.value = format(spec.read()); feedback.hidden = true; input.blur(); }
+  });
+}
+
 $('camera').addEventListener('change', (e) => {
   state.cameraId = e.target.value; activePreset = null;
   fillSelect($('camera'), CAMERAS.filter((c) => !c.legacy || c.id === state.cameraId), state.cameraId, CAMERA_GROUPS);
@@ -668,6 +844,16 @@ $('presets').addEventListener('click', (e) => {
   updateLook();
 });
 $('lens').addEventListener('change', (e) => chooseLens(e.target.value));
+[0, 1].forEach((index) => {
+  $('frame-lens-' + (index + 1)).addEventListener('change', (event) => {
+    const slot = state.frameLenses[index];
+    const selected = LENSES.find((item) => item.id === event.target.value);
+    slot.lensId = selected?.id || '';
+    slot.focal = selected ? clamp(state.focal, selected.focal[0], selected.focal[1]) : null;
+    clearHold();
+    schedule();
+  });
+});
 function onFilter() {
   const next = nearestLens();
   if (next) chooseLens(next.id); else { fillLenses(); schedule(); }
@@ -683,23 +869,25 @@ $('views').addEventListener('click', (e) => {
   onFilter();
 });
 $('focal').addEventListener('input', (e) => { state.focal = +e.target.value; schedule(); });
-$('scenes').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-scene]');
-  if (!b) return;
+$('scene-select').addEventListener('change', (e) => {
   const prevScene = scene();
-  state.sceneId = b.dataset.scene;
+  state.sceneId = e.target.value;
   applySceneDefaults(prevScene, scene());
   state.distance = null; state.afTracksSubject = true; lastFEq = null;
   clearHold();
   if (renderer) renderer.setScene(scene());
   schedule();
 });
+// Controls over the picture must not initiate focus or comparison dragging.
+for (const type of ['pointerdown', 'pointermove', 'pointerup']) {
+  document.querySelector('.scene-control').addEventListener(type, (e) => e.stopPropagation());
+}
 document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { state.mode = b.dataset.mode; schedule(); }));
 document.querySelectorAll('[data-support]').forEach((b) => b.addEventListener('click', () => { state.support = b.dataset.support; schedule(); }));
 document.querySelectorAll('[data-nd]').forEach((b) => b.addEventListener('click', () => { state.nd = +b.dataset.nd; schedule(); }));
 document.querySelectorAll('[data-zoom]').forEach((b) => b.addEventListener('click', () => { state.loupeZoom = +b.dataset.zoom; schedule(); }));
 $('aperture').addEventListener('input', (e) => { state.N = apertureList(lens())[+e.target.value]; schedule(); });
-$('shutter').addEventListener('input', (e) => { state.shutter = SHUTTERS[+e.target.value][1]; schedule(); });
+$('shutter').addEventListener('input', (e) => { state.shutter = shutterList()[+e.target.value][1]; schedule(); });
 $('iso').addEventListener('input', (e) => { state.iso = isoList(camera())[+e.target.value]; schedule(); });
 $('ec').addEventListener('input', (e) => { state.ec = +e.target.value; schedule(); });
 $('distance').addEventListener('input', (e) => { state.distance = +e.target.value; lastFEq = null; state.afTracksSubject = true; schedule(); });
@@ -758,6 +946,9 @@ $('grid').addEventListener('change', (e) => { state.grid = e.target.checked; sch
     const r = vf.getBoundingClientRect();
     const nx = ((e.clientX - r.left) / r.width) * 2 - 1;
     const ny = 1 - ((e.clientY - r.top) / r.height) * 2;
+    // In the widened framing preview, focus is defined in the current lens's frame.
+    const frameScale = previewScale();
+    if (Math.abs(nx) > frameScale || Math.abs(ny) > frameScale) return;
     const cam = camera();
     const W = cam.sensor[0], H = cam.sensor[1];
     const [ux, uy] = undistortMM(nx * W / 2, ny * H / 2, shot.k1, shot.icR);
@@ -765,7 +956,7 @@ $('grid').addEventListener('change', (e) => { state.grid = e.target.checked; sch
     const ix = Math.floor((ux - vp.inRect[0]) / vp.pxIn), iy = Math.floor((vp.inRect[3] - uy) / vp.pxIn);
     const z = await renderer.depthAt(ix, iy);
     if (z == null || !v) return;
-    state.af = [clamp(nx, -0.98, 0.98), clamp(ny, -0.98, 0.98)];
+    state.af = [clamp(nx / frameScale, -0.98, 0.98), clamp(ny / frameScale, -0.98, 0.98)];
     state.afTracksSubject = false;
     state.focusM = clamp(z > 5e4 ? 1e4 : z, lens().minFocus, 1e4);
     schedule();
@@ -788,6 +979,7 @@ function syncCompareUI() {
   $('hold').textContent = t(state.comparing ? 'compare.replace' : 'compare.hold');
   $('clear-hold').hidden = !state.comparing;
   $('hold-chip').textContent = t(state.comparing ? 'compare.stop' : 'chip.hold');
+  if (frameGeometry) renderFrames();
 }
 function holdA() {
   if (!renderer) return;

@@ -137,6 +137,18 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .viewfinder { position: relative; width: 100%; aspect-ratio: 3 / 2; background: var(--stage); border-radius: var(--r-lg); overflow: hidden; cursor: crosshair; touch-action: manipulation; max-width: 100%; }
 .viewfinder.comparing { touch-action: none; }
 .viewfinder canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.scene-control { position: absolute; top: 12px; left: 12px; z-index: 5; max-width: min(60%, 270px); }
+.scene-control select { width: 100%; height: 36px; padding: 0 35px 0 14px; border-radius: 18px; color: #fff; background-color: rgba(0, 0, 0, 0.68); background-position: right 13px center; font-size: 13px; font-weight: 600; }
+.scene-control select option { color: var(--tx1); background: var(--s1); }
+.frame-lines { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; filter: drop-shadow(0 1px 2px #000); }
+.frame-lines rect { fill: none; vector-effect: non-scaling-stroke; stroke-width: 2; }
+.frame-lines .frame-primary { stroke: #fff; }
+.frame-lines .frame-one { stroke: var(--blue); stroke-dasharray: 7 4; }
+.frame-lines .frame-two { stroke: var(--warn); stroke-dasharray: 2 4; }
+.frame-legend { position: absolute; z-index: 3; left: 12px; bottom: 48px; display: flex; flex-wrap: wrap; gap: 4px; max-width: calc(100% - 24px); pointer-events: none; }
+.frame-legend span { padding: 3px 7px; border-radius: 8px; background: rgba(0, 0, 0, 0.72); color: #fff; font-size: 12px; line-height: 17px; font-weight: 600; }
+.frame-legend .frame-one { border-left: 3px dashed var(--blue); }
+.frame-legend .frame-two { border-left: 3px dotted var(--warn); }
 /* AF point as four corner brackets; white so it reads on any picture */
 .af {
   --len: 9px; --c: #fff;
@@ -158,7 +170,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .split:focus-visible { outline: none; }
 .split:focus-visible::before { outline: 2px solid var(--blue-text); outline-offset: 2px; }
 .split::before { content: "⟷"; position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); width: 32px; height: 32px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; font-size: 15px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); }
-.ab-labels { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; gap: 8px; }
+.ab-labels { position: absolute; top: 54px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; gap: 8px; }
 .ab-labels span { font-size: 12px; line-height: 16px; font-weight: 600; color: #fff; background: rgba(0, 0, 0, 0.6); padding: 4px 10px; border-radius: 12px; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Phone-only shortcut over the picture, so A/B can be started while the settings are in use */
 .vf-chip { display: none; position: absolute; top: 12px; right: 12px; z-index: 4; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: transform 0.12s ease-out; }
@@ -223,6 +235,15 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--tx3); }
 .field-label output, .val { font-size: 16px; line-height: 22px; font-weight: 700; color: var(--blue-text); }
 .is-auto .val::after { content: var(--auto-label); color: var(--tx3); font-weight: 500; font-size: 13px; }
+.value-entry { display: inline-flex; align-items: center; gap: 3px; min-height: 36px; padding: 0 10px; border-radius: 10px; background: var(--s2); color: var(--tx3); font-size: 13px; }
+.value-entry input { width: 68px; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--blue-text); font: inherit; font-size: 16px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.value-entry input:disabled { color: var(--tx3); opacity: 0.7; }
+.value-entry input:focus-visible { outline: 2px solid var(--blue-text); outline-offset: 3px; border-radius: 3px; }
+.value-entry input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.value-entry input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.is-auto .value-entry::after { content: var(--auto-label); color: var(--tx3); font-size: 12px; }
+.input-feedback { color: var(--warn); font-size: 12px; line-height: 18px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .note { color: var(--tx3); font-size: 13px; line-height: 19px; margin: 0; }
 .note:empty { display: none; }
 .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -233,6 +254,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .quick-starts summary { cursor: pointer; font-size: 15px; font-weight: 600; }
 .quick-starts[open] summary { margin-bottom: 12px; }
 .quick-starts .note { margin-top: 10px; }
+#frame-settings > .field { margin-top: 12px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .focus-line { display: grid; gap: 12px; }
 .tabs { display: none; }
@@ -293,7 +315,15 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
   .status { font-size: 0; padding: 0; background: none; gap: 0; height: auto; }
   .vf-info { font-size: 14px; padding: 24px 14px 10px; gap: 4px 12px; }
 }
-@media (max-width: 400px) { .tabs { gap: 14px; } .tabs button { font-size: 14px; } }
+@media (max-width: 400px) {
+  .tabs { gap: 14px; } .tabs button { font-size: 14px; }
+  .strip-head .strip-label { display: none; }
+  .strip-head { gap: 4px; }
+  .strip-head .btn { padding-inline: 8px; font-size: 12px; }
+  .strip-head .tag { padding-inline: 6px; font-size: 11px; }
+  .strip-head .value-entry { padding-inline: 6px; }
+  .strip-head .value-entry input { width: 48px; }
+}
 @media (max-width: 340px) { .tabs { gap: 8px; } .tabs button { font-size: 13px; } .strip-head .strip-label { display: none; } }
 @media (max-width: 380px) { .brand { white-space: normal; line-height: 22px; } }
 /* Short phones: cap the pinned picture so the settings keep room */
@@ -326,6 +356,13 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
     <div class="dock">
       <div class="viewfinder" id="viewfinder">
         <canvas id="view" aria-label="Rendered photograph. Click to focus there." data-i18n-aria="aria.view"></canvas>
+        <svg id="frame-lines" class="frame-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" hidden>
+          <rect class="frame-primary" id="frame-primary"></rect>
+          <rect class="frame-one" id="frame-one" hidden></rect>
+          <rect class="frame-two" id="frame-two" hidden></rect>
+        </svg>
+        <div class="frame-legend" id="frame-legend" aria-live="polite" hidden></div>
+        <div class="scene-control"><select id="scene-select" aria-label="Location" data-i18n-aria="group.location"></select></div>
         <div class="af" id="af-box" aria-hidden="true"></div>
         <div class="split" id="split" hidden role="slider" tabindex="0" aria-label="Comparison divider" data-i18n-aria="aria.split" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
         <div class="ab-labels" id="ab-labels" hidden><span>A · <span id="held-desc"></span></span><span><span data-i18n="ab.live">B · live</span> · <span id="live-desc"></span></span></div>
@@ -351,7 +388,8 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
         <div class="strip-col">
           <div class="strip-head">
             <span class="strip-label" data-i18n="strip.focus">Focus</span>
-            <b class="strip-val" id="focus-val">2.40 m</b>
+            <span class="value-entry"><input id="focus-input" type="number" step="any" inputmode="decimal" aria-label="Focus distance in metres" data-i18n-aria="input.focus"><span aria-hidden="true">m</span></span>
+            <b class="sr-only" id="focus-val" aria-hidden="true">2.40 m</b>
             <span class="tag" id="focus-src">Subject</span>
             <button type="button" class="btn btn-sm btn-weak btn-aim-chip" id="refocus-chip" data-i18n="focus.refocus">Focus on subject</button>
           </div>
@@ -369,7 +407,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 
       <nav class="tabs" role="tablist" aria-label="Settings" data-i18n-aria="aria.tabs">
         <button type="button" role="tab" data-tab="gear" id="tab-gear" data-i18n="group.gear">Gear</button>
-        <button type="button" role="tab" data-tab="location" id="tab-location" data-i18n="group.location">Location</button>
+        <button type="button" role="tab" data-tab="location" id="tab-location" data-i18n="group.distance">Distance</button>
         <button type="button" role="tab" data-tab="exposure" id="tab-exposure" aria-selected="true" data-i18n="group.exposure">Exposure</button>
         <button type="button" role="tab" data-tab="picture" id="tab-picture" data-i18n="group.picture">Picture</button>
         <button type="button" role="tab" data-tab="results" id="tab-results" data-i18n="tab.results">Results</button>
@@ -410,7 +448,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
   <aside class="controls" aria-label="Camera settings" data-i18n-aria="aria.controls">
     <section class="group" data-panel="gear">
       <h2 data-i18n="group.gear">Gear</h2>
-      <details class="quick-starts">
+      <details class="quick-starts" id="quick-starts">
         <summary data-i18n="group.start">Quick starts</summary>
         <div class="chips" id="presets"></div>
         <p class="note" id="preset-look" data-i18n="start.note">One click sets up a comparison and tells you what to look at.</p>
@@ -425,15 +463,30 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
       <p class="note lens-spec" id="lens-spec"></p>
       <p class="note" id="lens-note"></p>
       <p class="note" id="lens-est"></p>
-      <label class="field" id="focal-row"><span class="field-label"><span data-i18n="field.focal">Focal length</span> <output id="focal-val"></output></span><input type="range" id="focal" step="1"></label>
+      <div class="field" id="focal-row"><div class="field-label"><label for="focal-input" data-i18n="field.focal">Focal length</label><span class="value-entry"><input id="focal-input" type="number" step="any" inputmode="decimal" aria-label="Focal length in millimetres" data-i18n-aria="input.focal"><span aria-hidden="true">mm</span></span><output class="sr-only" id="focal-val" aria-hidden="true"></output></div><input type="range" id="focal" step="0.001" aria-label="Focal length" data-i18n-aria="field.focal"></div>
     </section>
 
     <section class="group" data-panel="location">
-      <h2 data-i18n="group.location">Location</h2>
-      <div class="chips" id="scenes"></div>
+      <h2 data-i18n="group.distance">Distance</h2>
       <p class="note" id="scene-note"></p>
-      <label class="field"><span class="field-label"><span data-i18n="field.distance">Distance to subject</span> <output id="distance-val"></output></span><input type="range" id="distance" step="0.01"></label>
+      <div class="field"><div class="field-label"><label for="distance-input" data-i18n="field.distance">Distance to subject</label><span class="value-entry"><input id="distance-input" type="number" step="any" inputmode="decimal" aria-label="Subject distance in metres" data-i18n-aria="input.distance"><span aria-hidden="true">m</span></span><output class="sr-only" id="distance-val" aria-hidden="true"></output></div><input type="range" id="distance" step="0.001" aria-label="Distance to subject" data-i18n-aria="field.distance"></div>
       <label class="check"><input type="checkbox" id="keep" checked> <span data-i18n="field.keep">Keep subject size when changing focal length</span></label>
+      <details class="quick-starts" id="frame-settings">
+        <summary data-i18n="frame.title">Compare lens frames</summary>
+        <p class="note" data-i18n="frame.help">Choose up to two lenses. The widest view is shown at the same camera position; outlines approximate each frame. Blur and optical effects use the current lens.</p>
+        <div class="field">
+          <label for="frame-lens-1" class="field-label" data-i18n="frame.lens1">Comparison lens 1</label>
+          <select id="frame-lens-1"></select>
+          <p class="note lens-spec bad" id="frame-coverage-1"></p>
+          <label class="field-label" for="frame-focal-1"><span data-i18n="field.focal">Focal length</span><span class="value-entry"><input id="frame-focal-1" type="number" step="any" inputmode="decimal" aria-label="Comparison lens 1 focal length in millimetres" data-i18n-aria="frame.focal1"><span aria-hidden="true">mm</span></span></label>
+        </div>
+        <div class="field">
+          <label for="frame-lens-2" class="field-label" data-i18n="frame.lens2">Comparison lens 2</label>
+          <select id="frame-lens-2"></select>
+          <p class="note lens-spec bad" id="frame-coverage-2"></p>
+          <label class="field-label" for="frame-focal-2"><span data-i18n="field.focal">Focal length</span><span class="value-entry"><input id="frame-focal-2" type="number" step="any" inputmode="decimal" aria-label="Comparison lens 2 focal length in millimetres" data-i18n-aria="frame.focal2"><span aria-hidden="true">mm</span></span></label>
+        </div>
+      </details>
     </section>
 
     <section class="group" data-panel="exposure">
@@ -443,10 +496,10 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
         <button type="button" data-mode="M" id="mode-m" data-i18n="mode.M">Manual</button>
         <button type="button" data-mode="MA" id="mode-ma" data-i18n="mode.MA">M + auto ISO</button>
       </div>
-      <label class="field"><span class="field-label"><span data-i18n="field.aperture">Aperture</span> <span class="val" id="aperture-val"></span></span><input type="range" id="aperture" min="0" step="1"></label>
-      <label class="field" id="shutter-row"><span class="field-label"><span data-i18n="field.shutter">Shutter</span> <span class="val" id="shutter-val"></span></span><input type="range" id="shutter" min="0" step="1"></label>
-      <label class="field" id="iso-row"><span class="field-label"><span data-i18n="field.iso">ISO</span> <span class="val" id="iso-val"></span></span><input type="range" id="iso" min="0" step="1"></label>
-      <label class="field" id="ec-row"><span class="field-label"><span data-i18n="field.ec">Exposure compensation</span> <output id="ec-val"></output></span><input type="range" id="ec" min="-3" max="3" step="0.3333333"></label>
+      <div class="field"><div class="field-label"><label for="aperture-input" data-i18n="field.aperture">Aperture</label><span class="value-entry"><span aria-hidden="true">f/</span><input id="aperture-input" type="number" step="any" inputmode="decimal" aria-label="Aperture" data-i18n-aria="field.aperture"></span><span class="sr-only" id="aperture-val" aria-hidden="true"></span></div><input type="range" id="aperture" min="0" step="1" aria-label="Aperture" data-i18n-aria="field.aperture"></div>
+      <div class="field" id="shutter-row"><div class="field-label"><label for="shutter-input" data-i18n="field.shutter">Shutter</label><span class="value-entry"><input id="shutter-input" type="text" inputmode="text" aria-label="Shutter speed in seconds" data-i18n-aria="input.shutter"><span aria-hidden="true">s</span></span><span class="sr-only" id="shutter-val" aria-hidden="true"></span></div><input type="range" id="shutter" min="0" step="1" aria-label="Shutter" data-i18n-aria="field.shutter"></div>
+      <div class="field" id="iso-row"><div class="field-label"><label for="iso-input" data-i18n="field.iso">ISO</label><span class="value-entry"><input id="iso-input" type="number" step="1" inputmode="numeric" aria-label="ISO" data-i18n-aria="field.iso"></span><span class="sr-only" id="iso-val" aria-hidden="true"></span></div><input type="range" id="iso" min="0" step="1" aria-label="ISO" data-i18n-aria="field.iso"></div>
+      <div class="field" id="ec-row"><div class="field-label"><label for="ec-input" data-i18n="field.ec">Exposure compensation</label><span class="value-entry"><input id="ec-input" type="number" step="any" inputmode="decimal" aria-label="Exposure compensation in EV" data-i18n-aria="input.ec"><span aria-hidden="true">EV</span></span><output class="sr-only" id="ec-val" aria-hidden="true"></output></div><input type="range" id="ec" min="-3" max="3" step="0.001" aria-label="Exposure compensation" data-i18n-aria="field.ec"></div>
       <div class="field"><span class="field-label" data-i18n="field.nd">ND filter</span>
         <div class="seg lines" role="group" aria-label="ND filter" data-i18n-aria="aria.nd">
           <button type="button" data-nd="0" id="nd-0" data-i18n="nd.0">None</button>

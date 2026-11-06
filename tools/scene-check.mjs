@@ -48,18 +48,20 @@ const exposure = (page) => page.evaluate(() => ({ iso: window.__lvs.state.iso, s
 
 {
   const { page, ctx, errors } = await open('?q=draft');
-  const chips = await page.evaluate(() => [...document.querySelectorAll('[data-scene]')].map((b) => b.dataset.scene));
-  check('a button for every scene', JSON.stringify(chips) === JSON.stringify(SCENE_LIST.map((s) => s.id)), chips.join(','));
+  const choices = await page.evaluate(() => [...document.querySelectorAll('#scene-select option')].map((o) => o.value));
+  check('a dropdown option for every scene', JSON.stringify(choices) === JSON.stringify(SCENE_LIST.map((s) => s.id)), choices.join(','));
   let e = await exposure(page);
   check('daylight scene starts at ISO 100 and stabilised handheld', e.iso === 100 && e.support === 'stabilized', JSON.stringify(e));
-  await page.click('#scene-camp');
+  await page.selectOption('#scene-select', 'camp');
+  await page.waitForFunction(() => window.__lvs.state.iso === 3200);
   e = await exposure(page);
   check('the night scene suggests ISO 3200 on a tripod', e.iso === 3200 && e.support === 'tripod', JSON.stringify(e));
   check('and the auto shutter is a long exposure but within the 30 s limit', e.t > 0.5 && e.t <= 30, `${e.t.toFixed(2)} s`);
-  await page.click('#scene-lake');
+  await page.selectOption('#scene-select', 'lake');
+  await page.waitForFunction(() => window.__lvs.state.iso === 100);
   e = await exposure(page);
   check('going back to daylight restores ISO and support', e.iso === 100 && e.support === 'stabilized', JSON.stringify(e));
-  await page.click('#scene-street'); await page.click('#scene-garden');
+  await page.selectOption('#scene-select', 'street'); await page.selectOption('#scene-select', 'garden');
   e = await exposure(page);
   check('scenes without a suggestion leave the settings alone', e.iso === 100 && e.support === 'stabilized');
   check('no page errors while switching', errors.length === 0, errors.join(' | '));

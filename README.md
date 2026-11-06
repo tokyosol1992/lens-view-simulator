@@ -4,9 +4,13 @@ A web page for camera and lens customers. Pick a camera body, a lens and a sampl
 
 The interface is available in English and Korean. The **EN / 한국어** switch sits in the top bar on phones and desktops. It defaults to the browser language, remembers the choice in the browser, and can be set with `?lang=ko` or `?lang=en`. Switching language changes only the text, so the picture is not re-rendered.
 
-On wide screens the picture, focus scale, loupe and readouts are on the left and the settings are in a column on the right. On phones and narrow windows the picture, the focus scale and a tab bar stay pinned to the top, and the tabs (**Gear, Location, Exposure, Picture, Results**) choose which panel scrolls beneath them, so every change can be seen as it is made. A **Hold as A** chip over the picture starts a comparison without leaving the settings.
+On wide screens the picture, focus scale, loupe and readouts are on the left and the settings are in a column on the right. On phones and narrow windows the picture, the focus scale and a tab bar stay pinned to the top, and the tabs (**Gear, Distance, Exposure, Picture, Results**) choose which panel scrolls beneath them. The location selector sits on the picture; a **Hold as A** chip starts a comparison without leaving the settings.
 
 The **Gear** panel includes seven quick starts and a lens browser. Filter by brand, full-frame-equivalent view on the selected camera, and whether the lens image circle covers its sensor. Coverage does not check whether the lens mount actually fits the camera.
+
+Focal length, subject and focus distances, aperture, shutter speed, ISO and exposure compensation can be typed as well as adjusted with their sliders. Shutter accepts either seconds or a fraction such as `1/250`. Values outside the available range are adjusted and explained; automatic shutter and ISO remain read-only in their automatic modes.
+
+Under **Distance**, choose up to two comparison lenses to draw their frames over the current view. The camera position stays fixed and the picture widens to the widest selected view, with the current lens and both alternatives outlined. The outlines approximate centred framing and focus breathing; the background's blur and other optical effects still come from the current lens. Focus by clicking inside the current lens's frame. During A/B comparison the outlines appear on the live B side only. Changing comparison lenses clears a held A image so a capture made with a different preview framing is not mixed with the new one.
 
 **Copy link** (with **Reset settings**, under Picture) copies a link that reopens the setup: gear, location, exposure, focus point and picture settings. The address bar also follows those settings, so a reload restores them. A link that names something this version does not have still opens, with defaults. **Reset settings** puts exposure, focus and picture settings back to the start and keeps the gear, the location and a held A.
 
@@ -83,10 +87,13 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `tools/catalog-check.mjs` | Checks the catalog: every field present, unique ids, pixel counts match the sensor shape, real products marked and translated |
 | `tools/layout-check.mjs` | Checks the responsive layout without a GPU, at phone, tablet and desktop widths in both languages: no overflow, header not overlapping, picture and tabs pinned on narrow screens, one panel per tab, loupe keeps its size. `FONT_DIR=<pretendard folder>` measures with the real font offline |
 | `tools/flow-check.mjs` | Checks catalog filters, camera-dependent equivalent view, quick starts, older links, manual-focus restoration and the phone gear tab without a GPU |
+| `tools/controls-check.mjs` | Checks typed values, automatic modes, invalid input, shared settings and the location selector without a GPU |
+| `tools/frame-check.mjs` | Checks frame geometry, fixed position, comparison lenses and link restoration without a GPU |
+| `tools/frame-gpu-check.mjs` | Checks the widened WebGPU preview, focus boundary and A/B interaction |
 | `tools/interact.mjs` | Clicks to focus, holds A, refocuses and switches lens in headless Chromium |
 | `tools/shoot.mjs` | Renders setups headlessly and saves screenshots, e.g. `node tools/shoot.mjs out "scene=street&lens=p85&q=draft"` |
 
-A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `keep` (`0` to let the subject size change with focal length), `focus` (m) and `af` (`x,y` from -1 to 1) for a manual focus point, `zoom` (loupe 1, 2 or 4), `grid` (`0` hides the loupe grid), `zebra` (`1` shows clipped highlights), `wb`, `style`, `lang` (`en`, `ko`), `tab` (`gear`, `location`, `exposure`, `picture`, `results`: the panel shown on narrow screens) and `q` (`draft`, `standard`, `high`).
+A setup can be shared as a link. URL parameters: `camera`, `lens`, `scene` (ids from the catalog), `focal`, `f` (f-number), `t` (shutter, e.g. `1/250` or `2`), `iso`, `mode` (`A`, `M`, `MA`), `ec`, `nd` (stops), `support` (`tripod`, `stabilized`, `handheld`), `dist` (m), `keep` (`0` to let the subject size change with focal length), `focus` (m) and `af` (`x,y` from -1 to 1) for a manual focus point, `zoom` (loupe 1, 2 or 4), `grid` (`0` hides the loupe grid), `zebra` (`1` shows clipped highlights), `wb`, `style`, `lang` (`en`, `ko`), `tab` (`gear`, `location`, `exposure`, `picture`, `results`: the panel shown on narrow screens), `cmp1` / `cmp2` (comparison lens ids), `cmp1f` / `cmp2f` (their focal lengths), and `q` (`draft`, `standard`, `high`).
 
 ## Products
 
