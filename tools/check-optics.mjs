@@ -1,6 +1,8 @@
 // Sanity checks for src/optics.js against textbook values.  node tools/check-optics.mjs
 import * as O from '../src/optics.js';
-import { CAMERAS, LENSES } from '../src/catalog.js';
+import { CAMERAS, LENSES, CAMERA_GROUPS, LENS_GROUPS, WHITE_BALANCE, STYLES } from '../src/catalog.js';
+import { PRESETS } from '../src/presets.js';
+import { SCENE_LIST } from '../src/scenes.js';
 
 let failed = 0;
 const near = (label, got, want, tol) => {
@@ -33,6 +35,21 @@ near('Distortion inverse round trip', (() => { const rd = O.distortForward(ru, k
 near('Mid-grey SNR grows with ISO drop', O.midGreySNR(ff, 100) / O.midGreySNR(ff, 6400) > 5 ? 1 : 0, 1, 0);
 for (const l of LENSES) {
   if (l.maxN[0] < 1 || l.minN < l.maxN[1] || l.focal[1] < l.focal[0]) { failed++; console.log('FAIL catalog entry', l.id); }
+}
+// Catalog integrity: unique ids, known groups, Korean text, every preset resolves.
+const bad = (label, cond, detail = '') => { if (!cond) failed++; console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}${cond ? '' : ': ' + detail}`); };
+const dupes = (list) => list.filter((x, i) => list.indexOf(x) !== i);
+bad('camera ids unique', !dupes(CAMERAS.map((c) => c.id)).length, dupes(CAMERAS.map((c) => c.id)).join());
+bad('lens ids unique', !dupes(LENSES.map((l) => l.id)).length, dupes(LENSES.map((l) => l.id)).join());
+bad('cameras have a known group and Korean name', CAMERAS.every((c) => CAMERA_GROUPS.some((g) => g.id === c.group) && c.ko?.name), CAMERAS.filter((c) => !CAMERA_GROUPS.some((g) => g.id === c.group) || !c.ko?.name).map((c) => c.id).join());
+bad('lenses have a known group, Korean name and note', LENSES.every((l) => LENS_GROUPS.some((g) => g.id === l.group) && l.ko?.name && l.ko?.note), LENSES.filter((l) => !LENS_GROUPS.some((g) => g.id === l.group) || !l.ko?.name || !l.ko?.note).map((l) => l.id).join());
+bad('every group has members', [...CAMERA_GROUPS.filter((g) => !CAMERAS.some((c) => c.group === g.id)), ...LENS_GROUPS.filter((g) => !LENSES.some((l) => l.group === g.id))].length === 0);
+bad('every camera has at least one lens that covers it', CAMERAS.every((c) => LENSES.some((l) => O.lensCovers(l, c))), CAMERAS.filter((c) => !LENSES.some((l) => O.lensCovers(l, c))).map((c) => c.id).join());
+bad('sensor aspect ratio matches pixel grid', CAMERAS.every((c) => Math.abs(c.sensor[0] / c.sensor[1] - c.pixels[0] / c.pixels[1]) < 0.02), CAMERAS.filter((c) => Math.abs(c.sensor[0] / c.sensor[1] - c.pixels[0] / c.pixels[1]) >= 0.02).map((c) => c.id).join());
+for (const pr of PRESETS) {
+  const q = new URLSearchParams(pr.q);
+  const cam = CAMERAS.find((c) => c.id === q.get('camera')), ln = LENSES.find((l) => l.id === q.get('lens'));
+  bad(`preset ${pr.id} resolves, covers the sensor and has Korean text`, cam && ln && SCENE_LIST.some((x) => x.id === q.get('scene')) && O.lensCovers(ln, cam) && pr.ko?.name && pr.ko?.look && pr.look, pr.q);
 }
 console.log(failed ? `${failed} check(s) failed` : 'all optics checks passed');
 process.exit(failed ? 1 : 0);

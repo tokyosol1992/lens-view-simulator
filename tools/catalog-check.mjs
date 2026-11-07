@@ -36,4 +36,9 @@ for (const l of LENSES.filter((x) => x.kind === 'product')) {
   const fits = CAMERAS.filter((c) => l.imageCircle >= O.sensorDiag(c) * 0.995);
   check(`lens ${l.id}: covers at least one body`, fits.length > 0, `${fits.length} bodies`);
 }
+// The expanded versions should retain two published details already present in the original catalog.
+const sony14 = LENSES.find((l) => l.id === 'sony-fe-14mm-f-1-8-gm');
+const sonyStf = LENSES.find((l) => l.id === 'sony-fe-100mm-f-2-8-stf-gm-oss');
+check('Sony FE 14mm GM retains its nine aperture blades', sony14?.blades === 9);
+check('Sony 100mm STF retains the f/2.8 to T5.6 transmission loss', !!sonyStf && Math.abs(sonyStf.transmission - 2) < 1e-9);
 process.exit(failed ? 1 : 0);

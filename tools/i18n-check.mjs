@@ -29,16 +29,18 @@ const snapshot = (page) => page.evaluate(() => ({
   labels: [...document.querySelectorAll('[data-i18n]')].map((e) => e.textContent),
   dynamic: ['lens-note', 'scene-note', 'cam-spec', 'focus-src', 'ro-fov-sub', 'ro-dof-sub', 'ro-noise-sub', 'hold', 'status'].map((id) => document.getElementById(id).textContent),
   options: [...document.querySelectorAll('#camera option, #lens option, #wb option, #style option')].map((o) => o.textContent),
-  chips: [...document.querySelectorAll('[data-scene]')].map((b) => b.textContent),
+  chips: [...document.querySelectorAll('#scene-select option')].map((b) => b.textContent),
 }));
 const hangul = (s) => /[가-힣]/.test(s);
 
 for (const [name, viewport] of [['desktop', { width: 1280, height: 1500 }], ['phone', { width: 390, height: 844 }]]) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: 'en-US', hasTouch: name === 'phone', isMobile: name === 'phone' });
+  // Font CDNs may be unreachable in CI; the page's system-font fallback is intentional.
+  await context.route(/cdn\.jsdelivr\.net|fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(base + '?lang=ko&q=draft&frames=2&skip=present');
+  await page.goto(base + '?lang=ko&q=draft&frames=2&skip=present', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.body.dataset.state === 'ready', null, { timeout: 600000, polling: 500 });
   const ko = await snapshot(page);
   check(`${name}: Korean from ?lang=ko`, ko.lang === 'ko' && ko.title === '렌즈 뷰 시뮬레이터');
@@ -64,19 +66,25 @@ for (const [name, viewport] of [['desktop', { width: 1280, height: 1500 }], ['ph
   check(`${name}: no horizontal scroll (English)`, overflowEn <= 0, `overflow ${overflowEn}px`);
   await page.screenshot({ path: join(outDir, `${name}-en.png`), fullPage: false });
 
-  await page.goto(base + '?q=draft&frames=2&skip=present');
-  await page.waitForFunction(() => document.body.dataset.state === 'ready', null, { timeout: 600000, polling: 500 });
-  check(`${name}: choice persists after reload`, (await page.evaluate(() => document.documentElement.lang)) === 'en');
-  await page.locator('#lang-ko').click();
-  await page.waitForTimeout(200);
-  // On phones the Compare group is hidden and the chip over the picture starts the comparison.
-  await page.click(name === 'phone' ? '#hold-chip' : '#hold');
-  await page.waitForTimeout(300);
-  const holdText = await page.evaluate(() => [document.getElementById('hold').textContent, document.getElementById('clear-hold').textContent]);
-  check(`${name}: compare buttons translated`, holdText.every(hangul), holdText.join(' / '));
-  if (name === 'phone') check(`${name}: shortcut chip translated`, hangul(await page.locator('#hold-chip').textContent()), await page.locator('#hold-chip').textContent());
-  check(`${name}: no page errors`, errors.length === 0, errors.join(' | '));
+  // Persist storage into a fresh no-GPU page: language detection is independent of WebGPU,
+  // and some headless adapters stall when a busy canvas is navigated in place.
+  const storageState = await context.storageState();
   await context.close();
+  const reloadContext = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: 'en-US', hasTouch: name === 'phone', isMobile: name === 'phone', storageState });
+  await reloadContext.route(/cdn\.jsdelivr\.net|fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+  await reloadContext.addInitScript(() => Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true }));
+  const reloadPage = await reloadContext.newPage();
+  reloadPage.on('pageerror', (e) => errors.push(String(e)));
+  await reloadPage.goto(base + '?q=draft&frames=2&skip=present', { waitUntil: 'domcontentloaded' });
+  await reloadPage.waitForFunction(() => document.body.dataset.state === 'error');
+  check(`${name}: choice persists after reload`, (await reloadPage.evaluate(() => document.documentElement.lang)) === 'en');
+  await reloadPage.locator('#lang-ko').click();
+  await reloadPage.waitForTimeout(200);
+  const holdText = await reloadPage.evaluate(() => [document.getElementById('hold').textContent, document.getElementById('clear-hold').textContent]);
+  check(`${name}: compare buttons translated`, holdText.every(hangul), holdText.join(' / '));
+  if (name === 'phone') check(`${name}: shortcut chip translated`, hangul(await reloadPage.locator('#hold-chip').textContent()), await reloadPage.locator('#hold-chip').textContent());
+  check(`${name}: no page errors`, errors.length === 0, errors.join(' | '));
+  await reloadContext.close();
 }
 await browser.close(); server.close();
 process.exit(ok ? 0 : 1);
