@@ -880,10 +880,7 @@ $('keep').addEventListener('change', (e) => { state.keepFraming = e.target.check
 $('refocus-chip').addEventListener('click', () => { state.afTracksSubject = true; schedule(); });
 $('jump-focus').addEventListener('click', () => {
   const target = $('focus-scale');
-  const dock = document.querySelector('.dock');
-  const pinned = getComputedStyle(dock).position === 'sticky';
-  const offset = pinned ? dock.getBoundingClientRect().height + (innerWidth > 980 ? 12 : 0) + 16 : 16;
-  window.scrollTo({ top: Math.max(0, window.scrollY + target.getBoundingClientRect().top - offset), behavior: 'instant' });
+  window.scrollTo({ top: Math.max(0, window.scrollY + target.getBoundingClientRect().top - 16), behavior: 'instant' });
   target.focus({ preventScroll: true });
 });
 $('grid').addEventListener('change', (e) => { state.grid = e.target.checked; schedule(); });
@@ -1035,22 +1032,19 @@ new ResizeObserver(() => { if (shot) { if (state.comparing) clearHold(); updateV
 new ResizeObserver(redrawScales).observe($('focus-scale'));
 new ResizeObserver(redrawScales).observe($('meter'));
 
-// Tabs (phones and tablets): one panel at a time scrolls beneath the pinned picture. Unselected panels
+// Tabs (phones and tablets): one panel is shown at a time. Unselected panels
 // are collapsed by CSS rather than hidden, so the loupe keeps its width. On wide screens every panel shows.
 (() => {
   const app = document.querySelector('.app');
   const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
   const panels = [...document.querySelectorAll('[data-panel]')];
-  const dock = document.querySelector('.dock');
   const KEY = 'lvs-tab';
   const valid = (n) => tabs.some((b) => b.dataset.tab === n);
-  const select = (name, { scroll = true, focus = false } = {}) => {
+  const select = (name, { focus = false } = {}) => {
     app.dataset.tab = name;
     tabs.forEach((b) => { const on = b.dataset.tab === name; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); });
     panels.forEach((p) => p.classList.toggle('is-off', p.dataset.panel !== name));
     try { localStorage.setItem(KEY, name); } catch { /* storage blocked */ }
-    // Start the new panel right under the pinned area instead of wherever the last one was scrolled to.
-    if (scroll && dock && getComputedStyle(dock).position === 'sticky' && window.scrollY > dock.offsetTop) window.scrollTo(0, dock.offsetTop);
   };
   tabs.forEach((b, i) => {
     b.addEventListener('click', () => select(b.dataset.tab));
@@ -1061,7 +1055,7 @@ new ResizeObserver(redrawScales).observe($('meter'));
   });
   let first = params.get('tab');
   if (!valid(first)) { try { first = localStorage.getItem(KEY); } catch { first = null; } }
-  select(valid(first) ? first : 'exposure', { scroll: false });
+  select(valid(first) ? first : 'exposure');
 })();
 
 
