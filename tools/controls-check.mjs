@@ -31,6 +31,7 @@ const state = () => page.evaluate(() => window.__lvs.state);
 const entry = async (id, value) => { await page.locator('#' + id).fill(value); await page.locator('#' + id).press('Enter'); await page.waitForTimeout(100); };
 await page.goto(base + '?lang=en&q=draft&lens=z2470', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => document.body.dataset.state === 'error');
+check('unavailable WebGPU reports an error instead of remaining in startup', await page.locator('#status').textContent() === 'GPU error' && await page.locator('#gpu-error').isVisible());
 check('advanced exposure is initially collapsed', !await page.locator('#exposure-details').evaluate((el) => el.open));
 await page.locator('#exposure-details summary').click();
 await page.click('#nd-3');

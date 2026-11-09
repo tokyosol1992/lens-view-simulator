@@ -4,7 +4,7 @@ A web page for camera and lens customers. Pick a camera body, a lens and a sampl
 
 The interface is available in English and Korean. The **EN / 한국어** switch sits in the top bar on phones and desktops. It defaults to the browser language, remembers the choice in the browser, and can be set with `?lang=ko` or `?lang=en`. Switching language changes only the text, so the picture is not re-rendered.
 
-On wide screens the picture stays visible while scrolling; exposure controls and the focus scale are below the picture, with camera and distance settings on the right. On phones and narrow windows the picture and tab bar stay pinned, and the tabs (**Camera, Distance, Exposure, Picture, Results**) choose which panel scrolls beneath them. The focus scale and exposure meter sit below the exposure controls. The location selector sits on the picture; a **Hold as A** chip starts a comparison without leaving the settings.
+On wide screens the picture is on the left, exposure controls and the focus scale are below it, and camera and distance settings are on the right. On phones and narrow windows the picture and tab bar scroll with the page, and the tabs (**Camera, Distance, Exposure, Picture, Results**) choose which panel scrolls beneath them. The focus scale and exposure meter sit below the exposure controls. The location selector sits on the picture; a **Hold as A** chip starts a comparison without leaving the settings.
 
 The exposure panel puts ND filters and camera support under **More exposure settings**, and **Go to focus** scrolls to the focus scale. With **Keep subject size** enabled, changing focal length also changes camera-to-subject distance.
 
@@ -87,7 +87,7 @@ scene pass ──► DOF gather ──► aberrations + diffraction ──► ac
 | `tools/scene-check.mjs` | Checks every location builds with complete data, has English and Korean text and at most 48 lights, and that the night scene's suggested exposure is applied and undone |
 | `tools/share-check.mjs` | Checks that a copied link reopens the same setup (four setups, round trip), that unknown ids fall back to defaults, that Copy link reaches the clipboard, and that Reset restores the starting settings |
 | `tools/catalog-check.mjs` | Checks the catalog: every field present, unique ids, pixel counts match the sensor shape, real products marked and translated |
-| `tools/layout-check.mjs` | Checks the responsive layout without a GPU, at phone, tablet and desktop widths in both languages: no overflow, header not overlapping, picture and tabs pinned on narrow screens, one panel per tab, loupe keeps its size. `FONT_DIR=<pretendard folder>` measures with the real font offline |
+| `tools/layout-check.mjs` | Checks the responsive layout without a GPU, at phone, tablet and desktop widths in both languages: no overflow, header not overlapping, picture and tabs scroll on narrow screens, one panel per tab, loupe keeps its size. `FONT_DIR=<pretendard folder>` measures with the real font offline |
 | `tools/flow-check.mjs` | Checks catalog filters, camera-dependent equivalent view, quick starts, older links, manual-focus restoration and the phone gear tab without a GPU |
 | `tools/controls-check.mjs` | Checks typed values, automatic modes, invalid input, shared settings and the location selector without a GPU |
 | `tools/frame-check.mjs` | Checks frame geometry, fixed position, comparison lenses and link restoration without a GPU |

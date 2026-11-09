@@ -61,7 +61,7 @@ function shadowMatrix(sunDir, center, half, depth) {
 
 export class Renderer {
   static async create(mainCanvas, loupeCanvas) {
-    if (!('gpu' in navigator)) throw new Error('webgpu-missing');
+    if (!navigator.gpu) throw new Error('webgpu-missing');
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
     if (!adapter) throw new Error('webgpu-adapter');
     const device = await adapter.requestDevice();

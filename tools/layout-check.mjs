@@ -72,10 +72,10 @@ for (const lang of ['en', 'ko']) {
       const visible = await page.evaluate(() => [...document.querySelectorAll('[data-panel]')].every((p) => p.getBoundingClientRect().height > 0));
       check(`${tag}: all panels show, no tab bar, compare shortcut visible`, visible && !m.tabsShown && m.chipShown);
       check(`${tag}: settings sit to the right of the picture`, m.ctl.left >= m.stage.right - 1, `controls ${m.ctl.left.toFixed(0)} vs stage ${m.stage.right.toFixed(0)}`);
-      check(`${tag}: picture is pinned`, m.pinned);
+      check(`${tag}: picture scrolls with the page`, !m.pinned);
     } else {
       check(`${tag}: tab bar and phone chip show`, m.tabsShown && m.chipShown);
-      check(`${tag}: picture and tabs are pinned`, m.pinned);
+      check(`${tag}: picture and tabs scroll with the page`, !m.pinned);
       const tabsFit = await page.evaluate(() => { const vw = document.documentElement.clientWidth; return [...document.querySelectorAll('.tabs button')].map((b) => b.getBoundingClientRect().right).every((x) => x <= vw + 0.5); });
       if (width >= 360) check(`${tag}: all five tabs are visible without scrolling the tab bar`, tabsFit);
       for (const tab of TABS) {
@@ -88,13 +88,12 @@ for (const lang of ['en', 'ko']) {
       await page.click('#tab-exposure');
       const loupeHidden = await page.evaluate(() => document.querySelector('.loupe-frame').clientWidth);
       check(`${tag}: loupe keeps its size while its tab is closed`, loupeHidden > 150 && Math.abs(loupeHidden - loupeW) < 2, `${loupeHidden}px (open: ${loupeW}px)`);
-      // Scroll the exposure panel (tall) and check that the picture stays put.
-      const before = await page.evaluate(() => document.getElementById('viewfinder').getBoundingClientRect().top);
-      await page.evaluate(() => window.scrollTo(0, 400));
+      // The picture must leave the viewport as the user scrolls through controls.
+      const before = await page.evaluate(() => ({ top: document.getElementById('viewfinder').getBoundingClientRect().top, sy: scrollY }));
+      await page.evaluate(() => window.scrollBy(0, 400));
       await page.waitForTimeout(100);
-      const after = await page.evaluate(() => ({ top: document.getElementById('viewfinder').getBoundingClientRect().top, dock: document.querySelector('.dock').getBoundingClientRect().height, sy: scrollY, vh: innerHeight }));
-      check(`${tag}: picture stays at the top while the panel scrolls`, after.sy > 50 ? Math.abs(after.top) < 1 : true, `scrolled ${after.sy.toFixed(0)}px, picture top ${after.top.toFixed(1)}px (was ${before.toFixed(0)})`);
-      check(`${tag}: pinned area leaves room for the settings`, after.dock <= after.vh * (height < 700 ? 0.64 : 0.56), `${after.dock.toFixed(0)} of ${after.vh}px (${(after.dock / after.vh * 100).toFixed(0)}%)`);
+      const after = await page.evaluate(() => ({ top: document.getElementById('viewfinder').getBoundingClientRect().top, sy: scrollY }));
+      check(`${tag}: picture moves with the page`, after.sy > before.sy + 50 && Math.abs((before.top - after.top) - (after.sy - before.sy)) < 2, `scroll ${before.sy.toFixed(0)} to ${after.sy.toFixed(0)}, picture ${before.top.toFixed(0)} to ${after.top.toFixed(0)}`);
     }
     check(`${tag}: no page errors`, errors.length === 0, errors.join(' | '));
     await ctx.close();
