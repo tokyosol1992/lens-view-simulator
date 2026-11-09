@@ -95,6 +95,15 @@ for (const lang of ['en', 'ko']) {
       const after = await page.evaluate(() => ({ top: document.getElementById('viewfinder').getBoundingClientRect().top, sy: scrollY }));
       check(`${tag}: picture moves with the page`, after.sy > before.sy + 50 && Math.abs((before.top - after.top) - (after.sy - before.sy)) < 2, `scroll ${before.sy.toFixed(0)} to ${after.sy.toFixed(0)}, picture ${before.top.toFixed(0)} to ${after.top.toFixed(0)}`);
     }
+    if (!wide) await page.click('#tab-exposure');
+    const grid = await page.evaluate(() => {
+      const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+      const vf = box('#viewfinder'), dock = box('.dock');
+      const a = box('#aperture-input'), shutter = box('#shutter-input'), iso = box('#iso-input'), ec = box('#ec-input');
+      return { fillsWidth: Math.abs(vf.width - dock.width) < 2, twoColumns: a.left < shutter.left && iso.left < ec.left && a.top < iso.top && shutter.top < ec.top };
+    });
+    check(`${tag}: picture fills the available width`, grid.fillsWidth);
+    check(`${tag}: exposure controls use two columns`, grid.twoColumns);
     check(`${tag}: no page errors`, errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
