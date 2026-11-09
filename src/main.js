@@ -2,8 +2,8 @@ import { CAMERAS, LENSES, CAMERA_GROUPS, LENS_GROUPS, BRANDS, FORMATS, APERTURES
 import { PRESETS } from './presets.js';
 import * as O from './optics.js';
 import { getScene, SCENE_LIST } from './scenes.js';
-import { Renderer, cameraBasis } from './gpu/renderer.js';
-import { t, loc, getLang, setLang, applyStatic } from './i18n.js';
+import { Renderer, cameraBasis } from './gpu/renderer.js?v=20261109-2';
+import { t, loc, getLang, setLang, applyStatic } from './i18n.js?v=20261109-2';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -1067,12 +1067,13 @@ new ResizeObserver(redrawScales).observe($('meter'));
 
 // --- Boot ------------------------------------------------------------------------------------------
 async function boot() {
-  update();
   try {
+    update();
     renderer = await Renderer.create($('view'), $('loupe'));
   } catch (err) {
     const box = $('gpu-error');
     box.hidden = false;
+    $('status').textContent = t('status.gpuError');
     $('gpu-error-detail').textContent = String(err.message || err).startsWith('webgpu')
       ? t('gpu.noDevice')
       : String(err.message || err).slice(0, 600);
