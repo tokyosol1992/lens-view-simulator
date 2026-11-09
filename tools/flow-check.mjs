@@ -37,18 +37,12 @@ check('old phone and real camera models are hidden from the ordinary picker',
 
 await page.selectOption('#brand', 'sony');
 await page.selectOption('#lens', 'sony-fe-50mm-f-1-8');
-await page.click('[data-view="std"]');
-await page.waitForTimeout(100);
-check('full-frame 50mm is in the standard view', await page.locator('#lens option[value="sony-fe-50mm-f-1-8"]').count() === 1);
 await page.selectOption('#camera', 'apsc24');
 await page.waitForTimeout(100);
-check('APS-C changes the 50mm equivalent view', await page.locator('#lens option[value="sony-fe-50mm-f-1-8"]').count() === 0);
-await page.click('[data-view="portrait"]');
-await page.waitForTimeout(100);
 const fifty = page.locator('#lens option[value="sony-fe-50mm-f-1-8"]');
-check('APS-C 50mm appears in portrait and displays its actual equivalent', await fifty.count() === 1 && /≈7[67]/.test(await fifty.textContent()));
+check('APS-C 50mm displays its equivalent', await fifty.count() === 1 && /≈7[67]/.test(await fifty.textContent()));
+check('view categories and detailed lens copy are absent', await page.locator('#views, #lens-spec, #lens-note, #lens-est').count() === 0);
 
-await page.click('[data-view="all"]');
 await page.selectOption('#camera', 'mf645a');
 await page.check('#fits');
 await page.waitForTimeout(100);
@@ -58,7 +52,7 @@ await page.selectOption('#brand', 'all');
 await page.waitForTimeout(100);
 const compatible = await page.locator('#lens option').allTextContents();
 check('coverage filter finds lenses for the selected sensor', compatible.length > 0 && compatible.every((text) => !/dark corners/.test(text)));
-check('coverage filter does not promise mount compatibility', /does not check mount/.test(await page.locator('[data-i18n="lens.mountNote"]').textContent()));
+check('coverage filter does not promise mount compatibility', /mount compatibility is not checked/.test(await page.locator('[data-i18n="lens.mountNote"]').textContent()));
 
 await page.locator('#quick-starts summary').click();
 await page.click('#preset-bokeh');
@@ -98,7 +92,8 @@ phone.on('pageerror', (e) => phoneErrors.push(String(e)));
 await phone.goto(base + '?lang=ko&q=draft', { waitUntil: 'domcontentloaded' });
 await phone.waitForFunction(() => document.body.dataset.state === 'error');
 await phone.click('#tab-gear');
-check('phone gear tab includes the catalog and quick starts', await phone.locator('#brand').isVisible() && await phone.locator('#quick-starts summary').isVisible());
+check('phone camera and lens tab includes the catalog', await phone.locator('#brand').isVisible() && !await phone.locator('#quick-starts summary').isVisible());
+await phone.click('#tab-picture');
 await phone.locator('#quick-starts summary').click();
 check('phone quick starts expand on request', await phone.locator('#presets').isVisible());
 check('phone: mount and coverage explanation is translated', /마운트/.test(await phone.locator('[data-i18n="lens.mountNote"]').textContent()));

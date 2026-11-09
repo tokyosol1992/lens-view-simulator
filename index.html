@@ -74,7 +74,7 @@ button, select, input { font: inherit; color: inherit; }
 .brand { margin: 0; font-size: 20px; line-height: 28px; font-weight: 700; white-space: nowrap; }
 .brand .accent { color: var(--blue-text); }
 .tagline { color: var(--tx3); margin: 0; font-size: 13px; line-height: 19px; max-width: 74ch; text-wrap: pretty; }
-.top-end { display: flex; align-items: center; gap: 12px; }
+.top-end { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .status { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 16px; background: var(--s1); color: var(--tx2); font-size: 13px; font-weight: 500; white-space: nowrap; }
 .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--tx4); flex: none; }
 body[data-state="ready"] .status::before { background: var(--ok); }
@@ -132,7 +132,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .tag { height: 22px; display: inline-flex; align-items: center; padding: 0 9px; border-radius: 11px; background: var(--blue-tint); color: var(--blue-text); font-size: 12px; font-weight: 600; }
 
 /* Viewfinder column */
-.stage { display: grid; gap: 16px; min-width: 0; }
+.stage { display: grid; gap: 16px; min-width: 0; align-self: stretch; align-content: start; }
 .dock { display: grid; gap: 16px; min-width: 0; }
 .viewfinder { position: relative; width: 100%; aspect-ratio: 3 / 2; background: var(--stage); border-radius: var(--r-lg); overflow: hidden; cursor: crosshair; touch-action: manipulation; max-width: 100%; }
 .viewfinder.comparing { touch-action: none; }
@@ -173,7 +173,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .ab-labels { position: absolute; top: 54px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; gap: 8px; }
 .ab-labels span { font-size: 12px; line-height: 16px; font-weight: 600; color: #fff; background: rgba(0, 0, 0, 0.6); padding: 4px 10px; border-radius: 12px; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Phone-only shortcut over the picture, so A/B can be started while the settings are in use */
-.vf-chip { display: none; position: absolute; top: 12px; right: 12px; z-index: 4; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: transform 0.12s ease-out; }
+.vf-chip { display: block; position: absolute; top: 12px; right: 12px; z-index: 4; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: transform 0.12s ease-out; }
 .vf-chip:active { transform: scale(0.96); }
 .gpu-error { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; gap: 6px; color: var(--stage-fg); }
 .gpu-error strong { font-size: 18px; }
@@ -186,7 +186,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .strip-label { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--tx3); }
 .strip-val { font-size: 17px; line-height: 24px; font-weight: 700; }
 .strip-head .btn { margin-left: auto; }
-.btn-aim-chip { display: none; }
+.btn-aim-chip { display: inline-flex; }
 .strip-hint { margin: 2px 0 0; font-size: 13px; line-height: 18px; color: var(--tx3); }
 #focus-scale { width: 100%; height: 58px; display: block; cursor: ew-resize; touch-action: none; border-radius: 8px; }
 #focus-scale:focus-visible { outline: 2px solid var(--blue-text); outline-offset: 0; }
@@ -231,6 +231,13 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 .controls { display: grid; gap: 16px; min-width: 0; }
 .group { background: var(--s1); border-radius: var(--r-xl); padding: 20px; display: grid; gap: 16px; min-width: 0; }
 .group > h2 { margin-bottom: 0; }
+.exposure-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.exposure-head h2 { margin: 0; font-size: 17px; line-height: 24px; }
+.exposure-details summary { cursor: pointer; font-weight: 600; }
+.exposure-details-body { display: grid; gap: 16px; margin-top: 16px; }
+.fold summary { cursor: pointer; font-size: 17px; line-height: 24px; font-weight: 700; }
+.fold-body { display: grid; gap: 16px; margin-top: 16px; min-width: 0; }
+.group[data-panel="exposure"] > .strip { padding: 16px 0 0; border-radius: 0; }
 .field { display: grid; gap: 6px; }
 .field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--tx3); }
 .field-label output, .val { font-size: 16px; line-height: 22px; font-weight: 700; color: var(--blue-text); }
@@ -266,13 +273,19 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 @media (pointer: coarse) { input[type="range"] { height: 36px; } }
 @media (prefers-reduced-motion: reduce) { .progress, .btn, .chip, .seg button, .check input, .check input::after, .vf-chip { transition: none; } body[data-state="rendering"] .status::before { animation: none; } }
 
+@media (min-width: 981px) {
+  .dock { position: sticky; top: 12px; z-index: 2; }
+  .viewfinder { width: min(100%, calc((100vh - 220px) * var(--ar, 1.5))); margin-inline: auto; }
+}
+
 /* Tablet and phone. The viewfinder, focus scale and tab bar stay pinned to the top of the screen; the tabs
    choose which panel scrolls beneath them. The page itself scrolls, so the browser's own scroll,
    pickers and keyboard behave normally. Panels that are not selected are collapsed rather than removed,
    so the loupe keeps its width and stays rendered at the right size. */
 @media (max-width: 980px) {
   body { background: var(--s1); padding-top: 0; padding-bottom: 32px; }
-  .top { background: var(--bg); margin: 0 calc(var(--gxr) * -1) 0 calc(var(--gx) * -1); padding: 16px var(--gxr) 14px var(--gx); }
+  .top { grid-template-columns: minmax(0, 1fr) auto; background: var(--bg); margin: 0 calc(var(--gxr) * -1) 0 calc(var(--gx) * -1); padding: 16px var(--gxr) 14px var(--gx); }
+  .tagline { grid-column: 1 / -1; grid-row: 2; }
   .app { display: flex; flex-direction: column; gap: 0; align-items: stretch; }
   .stage { display: contents; }
   .dock { order: 1; position: sticky; top: 0; z-index: 30; gap: 0; background: var(--bg); margin-inline: calc(var(--gx) * -1) calc(var(--gxr) * -1); }
@@ -282,7 +295,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
   .strip { background: transparent; border-radius: 0; padding: 4px var(--gxr) 10px var(--gx); grid-template-columns: minmax(0, 1fr); gap: 0; }
   .strip-head { min-height: 32px; }
   .strip-hint { display: none; }
-  .strip .meter-col { display: none; }
+  .strip .meter-col { display: block; }
   .btn-aim-chip { display: inline-flex; }
   .tabs { display: flex; gap: 22px; padding: 0 var(--gxr) 0 var(--gx); overflow-x: auto; scrollbar-width: none; background: var(--s1); border-radius: 24px 24px 0 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.22); }
   .tabs::-webkit-scrollbar { display: none; }
@@ -290,6 +303,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
   .tabs button[aria-selected="true"] { color: var(--tx1); }
   .tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 1px; background: var(--blue-text); }
   .controls { order: 2; display: block; padding-top: 20px; }
+  .stage > .group[data-panel="exposure"] { order: 2; padding-top: 20px; }
   .below { order: 3; display: block; }
   .group, .card { background: transparent; border-radius: 0; padding: 0 0 8px; }
   .group { gap: 20px; }
@@ -297,6 +311,9 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
   .controls > .group[data-panel="focus"], .controls > .group[data-panel="compare"] { display: none; }
   [data-panel].is-off { height: 0; overflow: hidden; visibility: hidden; padding: 0; margin: 0; }
   .group > h2 { display: none; }
+  .fold-body { gap: 20px; }
+  .exposure-head h2 { display: none; }
+  .exposure-head { justify-content: flex-end; }
   .readouts { grid-template-columns: 1fr 1fr; }
 }
 @media (min-width: 641px) and (max-width: 980px) {
@@ -311,12 +328,16 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 }
 @media (max-width: 640px) { .below { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 520px) {
+  .top { grid-template-columns: minmax(0, 1fr); }
+  .top-end { justify-content: flex-start; grid-row: 2; }
+  .tagline { grid-row: 3; }
   .brand { font-size: 17px; }
   .top-end { gap: 8px; }
   .status { font-size: 0; padding: 0; background: none; gap: 0; height: auto; }
   .vf-info { font-size: 14px; padding: 24px 14px 10px; gap: 4px 12px; }
 }
 @media (max-width: 400px) {
+  .scene-control { max-width: 50%; }
   .tabs { gap: 14px; } .tabs button { font-size: 14px; }
   .strip-head .strip-label { display: none; }
   .strip-head { gap: 4px; }
@@ -345,6 +366,8 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
   <p class="tagline" data-i18n="tagline">Choose a body, a lens and a location. The frame renders through the lens and onto the sensor you picked, so differences in focus, blur, flare, sharpness and noise show up as they would in the photo.</p>
   <div class="top-end">
     <span class="status" id="status" role="status" data-i18n="status.starting">Starting WebGPU…</span>
+    <button type="button" class="btn btn-sm btn-weak" id="share" data-i18n="share.copy">Copy link</button>
+    <button type="button" class="btn btn-sm" id="reset" data-i18n="reset.label">Reset settings</button>
     <div class="seg lang" role="group" aria-label="Language" data-i18n-aria="aria.lang">
       <button type="button" data-lang="en" id="lang-en" lang="en">EN</button>
       <button type="button" data-lang="ko" id="lang-ko" lang="ko">한국어</button>
@@ -385,11 +408,52 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
         </div>
       </div>
 
+      <nav class="tabs" role="tablist" aria-label="Settings" data-i18n-aria="aria.tabs">
+        <button type="button" role="tab" data-tab="gear" id="tab-gear" data-i18n="group.gear">Gear</button>
+        <button type="button" role="tab" data-tab="location" id="tab-location" data-i18n="group.distance">Distance</button>
+        <button type="button" role="tab" data-tab="exposure" id="tab-exposure" aria-selected="true" data-i18n="group.exposure">Exposure</button>
+        <button type="button" role="tab" data-tab="picture" id="tab-picture" data-i18n="group.picture">Picture</button>
+        <button type="button" role="tab" data-tab="results" id="tab-results" data-i18n="tab.results">Results</button>
+      </nav>
+    </div>
+
+    <section class="group" data-panel="exposure">
+      <div class="exposure-head">
+        <h2 data-i18n="group.exposure">Exposure</h2>
+        <button type="button" class="btn btn-sm btn-weak" id="jump-focus" aria-controls="focus-scale" data-i18n="focus.jump">Go to focus</button>
+      </div>
+      <div class="seg" role="group" aria-label="Exposure mode" data-i18n-aria="aria.mode">
+        <button type="button" data-mode="A" id="mode-a" data-i18n="mode.A">Aperture priority</button>
+        <button type="button" data-mode="M" id="mode-m" data-i18n="mode.M">Manual</button>
+        <button type="button" data-mode="MA" id="mode-ma" data-i18n="mode.MA">M + auto ISO</button>
+      </div>
+      <div class="field"><div class="field-label"><label for="aperture-input" data-i18n="field.aperture">Aperture</label><span class="value-entry"><span aria-hidden="true">f/</span><input id="aperture-input" type="number" step="any" inputmode="decimal" aria-label="Aperture" data-i18n-aria="field.aperture"></span><span class="sr-only" id="aperture-val" aria-hidden="true"></span></div><input type="range" id="aperture" min="0" step="1" aria-label="Aperture" data-i18n-aria="field.aperture"></div>
+      <div class="field" id="shutter-row"><div class="field-label"><label for="shutter-input" data-i18n="field.shutter">Shutter</label><span class="value-entry"><input id="shutter-input" type="text" inputmode="text" aria-label="Shutter speed in seconds" aria-describedby="shutter-hint" data-i18n-aria="input.shutter"><span aria-hidden="true">s</span></span><span class="sr-only" id="shutter-val" aria-hidden="true"></span></div><input type="range" id="shutter" min="0" step="1" aria-label="Shutter" data-i18n-aria="field.shutter"><small class="note" id="shutter-hint" data-i18n="input.shutterHint">Enter seconds or a fraction, such as 1/250.</small></div>
+      <div class="field" id="iso-row"><div class="field-label"><label for="iso-input" data-i18n="field.iso">ISO</label><span class="value-entry"><input id="iso-input" type="number" step="1" inputmode="numeric" aria-label="ISO" data-i18n-aria="field.iso"></span><span class="sr-only" id="iso-val" aria-hidden="true"></span></div><input type="range" id="iso" min="0" step="1" aria-label="ISO" data-i18n-aria="field.iso"></div>
+      <div class="field" id="ec-row"><div class="field-label"><label for="ec-input" data-i18n="field.ec">Exposure compensation</label><span class="value-entry"><input id="ec-input" type="number" step="any" inputmode="decimal" aria-label="Exposure compensation in EV" data-i18n-aria="input.ec"><span aria-hidden="true">EV</span></span><output class="sr-only" id="ec-val" aria-hidden="true"></output></div><input type="range" id="ec" min="-3" max="3" step="0.001" aria-label="Exposure compensation" data-i18n-aria="field.ec"></div>
+      <details class="exposure-details" id="exposure-details">
+        <summary data-i18n="exposure.advanced">More exposure settings</summary>
+        <div class="exposure-details-body">
+      <div class="field"><span class="field-label" data-i18n="field.nd">ND filter</span>
+        <div class="seg lines" role="group" aria-label="ND filter" data-i18n-aria="aria.nd">
+          <button type="button" data-nd="0" id="nd-0" data-i18n="nd.0">None</button>
+          <button type="button" data-nd="3" id="nd-3" data-i18n="nd.3">ND8&#10;3 stops</button>
+          <button type="button" data-nd="6" id="nd-6" data-i18n="nd.6">ND64&#10;6 stops</button>
+          <button type="button" data-nd="10" id="nd-10" data-i18n="nd.10">ND1000&#10;10 stops</button>
+        </div>
+      </div>
+      <div class="seg" role="group" aria-label="Support" data-i18n-aria="aria.support">
+        <button type="button" data-support="tripod" id="sup-tripod" data-i18n="support.tripod">Tripod</button>
+        <button type="button" data-support="stabilized" id="sup-is" data-i18n="support.stabilized">Handheld + IS</button>
+        <button type="button" data-support="handheld" id="sup-hand" data-i18n="support.handheld">Handheld</button>
+      </div>
+        </div>
+      </details>
       <div class="strip">
         <div class="strip-col">
           <div class="strip-head">
             <span class="strip-label" data-i18n="strip.focus">Focus</span>
-            <span class="value-entry"><input id="focus-input" type="number" step="any" inputmode="decimal" aria-label="Focus distance in metres" data-i18n-aria="input.focus"><span aria-hidden="true">m</span></span>
+            <span class="value-entry"><input id="focus-input" type="number" step="0.01" inputmode="decimal" aria-label="Focus distance in metres" data-i18n-aria="input.focus"><span aria-hidden="true">m</span></span>
             <b class="sr-only" id="focus-val" aria-hidden="true">2.40 m</b>
             <span class="tag" id="focus-src">Subject</span>
             <button type="button" class="btn btn-sm btn-weak btn-aim-chip" id="refocus-chip" data-i18n="focus.refocus">Focus on subject</button>
@@ -406,14 +470,7 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
         </div>
       </div>
 
-      <nav class="tabs" role="tablist" aria-label="Settings" data-i18n-aria="aria.tabs">
-        <button type="button" role="tab" data-tab="gear" id="tab-gear" data-i18n="group.gear">Gear</button>
-        <button type="button" role="tab" data-tab="location" id="tab-location" data-i18n="group.distance">Distance</button>
-        <button type="button" role="tab" data-tab="exposure" id="tab-exposure" aria-selected="true" data-i18n="group.exposure">Exposure</button>
-        <button type="button" role="tab" data-tab="picture" id="tab-picture" data-i18n="group.picture">Picture</button>
-        <button type="button" role="tab" data-tab="results" id="tab-results" data-i18n="tab.results">Results</button>
-      </nav>
-    </div>
+    </section>
 
     <div class="below" data-panel="results">
       <div class="card">
@@ -448,30 +505,23 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 
   <aside class="controls" aria-label="Camera settings" data-i18n-aria="aria.controls">
     <section class="group" data-panel="gear">
-      <h2 data-i18n="group.gear">Gear</h2>
-      <details class="quick-starts" id="quick-starts">
-        <summary data-i18n="group.start">Quick starts</summary>
-        <div class="chips" id="presets"></div>
-        <p class="note" id="preset-look" data-i18n="start.note">One click sets up a comparison and tells you what to look at.</p>
-      </details>
+      <details class="fold" open><summary data-i18n="group.gear">Gear</summary><div class="fold-body">
       <label class="field"><span class="field-label" data-i18n="field.camera">Camera body</span><select id="camera"></select></label>
       <p class="note" id="cam-spec"></p>
       <label class="field"><span class="field-label" data-i18n="field.brand">Brand</span><select id="brand"></select></label>
-      <div class="field"><span class="field-label" data-i18n="field.view">View (full-frame equivalent)</span><div class="chips" id="views" role="group" aria-label="View (full-frame equivalent)" data-i18n-aria="field.view"></div></div>
-      <label class="check"><input type="checkbox" id="fits"> <span data-i18n="field.fits">Only lenses that cover this sensor</span></label>
-      <p class="note" data-i18n="lens.mountNote">Coverage does not check mount compatibility.</p>
+      <label class="check"><input type="checkbox" id="fits" aria-describedby="coverage-note"> <span data-i18n="field.fits">Only lenses that cover this sensor</span></label>
+      <p class="note" id="coverage-note" data-i18n="lens.mountNote">Coverage does not check mount compatibility.</p>
       <label class="field"><span class="field-label"><span data-i18n="field.lens">Lens</span> <output id="lens-count"></output></span><select id="lens"></select></label>
-      <p class="note lens-spec" id="lens-spec"></p>
-      <p class="note" id="lens-note"></p>
-      <p class="note" id="lens-est"></p>
       <div class="field" id="focal-row"><div class="field-label"><label for="focal-input" data-i18n="field.focal">Focal length</label><span class="value-entry"><input id="focal-input" type="number" step="any" inputmode="decimal" aria-label="Focal length in millimetres" data-i18n-aria="input.focal"><span aria-hidden="true">mm</span></span><output class="sr-only" id="focal-val" aria-hidden="true"></output></div><input type="range" id="focal" step="0.001" aria-label="Focal length" data-i18n-aria="field.focal"></div>
+      </div></details>
     </section>
 
     <section class="group" data-panel="location">
-      <h2 data-i18n="group.distance">Distance</h2>
+      <details class="fold" open><summary data-i18n="group.distance">Distance</summary><div class="fold-body">
       <p class="note" id="scene-note"></p>
-      <div class="field"><div class="field-label"><label for="distance-input" data-i18n="field.distance">Distance to subject</label><span class="value-entry"><input id="distance-input" type="number" step="any" inputmode="decimal" aria-label="Subject distance in metres" data-i18n-aria="input.distance"><span aria-hidden="true">m</span></span><output class="sr-only" id="distance-val" aria-hidden="true"></output></div><input type="range" id="distance" step="0.001" aria-label="Distance to subject" data-i18n-aria="field.distance"></div>
-      <label class="check"><input type="checkbox" id="keep" checked> <span data-i18n="field.keep">Keep subject size when changing focal length</span></label>
+      <div class="field"><div class="field-label"><label for="distance-input" data-i18n="field.distance">Distance to subject</label><span class="value-entry"><input id="distance-input" type="number" step="0.01" inputmode="decimal" aria-label="Subject distance in metres" data-i18n-aria="input.distance"><span aria-hidden="true">m</span></span><output class="sr-only" id="distance-val" aria-hidden="true"></output></div><input type="range" id="distance" step="0.001" aria-label="Distance to subject" data-i18n-aria="field.distance"></div>
+      <label class="check"><input type="checkbox" id="keep" aria-describedby="keep-hint" checked> <span data-i18n="field.keep">Keep subject size when changing focal length</span></label>
+      <p class="note" id="keep-hint" data-i18n="field.keepHint">Changing focal length also moves the camera and changes the distance you set.</p>
       <details class="quick-starts" id="frame-settings">
         <summary data-i18n="frame.title">Compare lens frames</summary>
         <p class="note" data-i18n="frame.help">Choose up to two lenses. The widest view is shown at the same camera position; outlines approximate each frame. Blur and optical effects use the current lens.</p>
@@ -488,50 +538,16 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
           <label class="field-label" for="frame-focal-2"><span data-i18n="field.focal">Focal length</span><span class="value-entry"><input id="frame-focal-2" type="number" step="any" inputmode="decimal" aria-label="Comparison lens 2 focal length in millimetres" data-i18n-aria="frame.focal2"><span aria-hidden="true">mm</span></span></label>
         </div>
       </details>
-    </section>
-
-    <section class="group" data-panel="exposure">
-      <h2 data-i18n="group.exposure">Exposure</h2>
-      <div class="seg" role="group" aria-label="Exposure mode" data-i18n-aria="aria.mode">
-        <button type="button" data-mode="A" id="mode-a" data-i18n="mode.A">Aperture priority</button>
-        <button type="button" data-mode="M" id="mode-m" data-i18n="mode.M">Manual</button>
-        <button type="button" data-mode="MA" id="mode-ma" data-i18n="mode.MA">M + auto ISO</button>
-      </div>
-      <div class="field"><div class="field-label"><label for="aperture-input" data-i18n="field.aperture">Aperture</label><span class="value-entry"><span aria-hidden="true">f/</span><input id="aperture-input" type="number" step="any" inputmode="decimal" aria-label="Aperture" data-i18n-aria="field.aperture"></span><span class="sr-only" id="aperture-val" aria-hidden="true"></span></div><input type="range" id="aperture" min="0" step="1" aria-label="Aperture" data-i18n-aria="field.aperture"></div>
-      <div class="field" id="shutter-row"><div class="field-label"><label for="shutter-input" data-i18n="field.shutter">Shutter</label><span class="value-entry"><input id="shutter-input" type="text" inputmode="text" aria-label="Shutter speed in seconds" aria-describedby="shutter-hint" data-i18n-aria="input.shutter"><span aria-hidden="true">s</span></span><span class="sr-only" id="shutter-val" aria-hidden="true"></span></div><input type="range" id="shutter" min="0" step="1" aria-label="Shutter" data-i18n-aria="field.shutter"><small class="note" id="shutter-hint" data-i18n="input.shutterHint">Enter seconds or a fraction, such as 1/250.</small></div>
-      <div class="field" id="iso-row"><div class="field-label"><label for="iso-input" data-i18n="field.iso">ISO</label><span class="value-entry"><input id="iso-input" type="number" step="1" inputmode="numeric" aria-label="ISO" data-i18n-aria="field.iso"></span><span class="sr-only" id="iso-val" aria-hidden="true"></span></div><input type="range" id="iso" min="0" step="1" aria-label="ISO" data-i18n-aria="field.iso"></div>
-      <div class="field" id="ec-row"><div class="field-label"><label for="ec-input" data-i18n="field.ec">Exposure compensation</label><span class="value-entry"><input id="ec-input" type="number" step="any" inputmode="decimal" aria-label="Exposure compensation in EV" data-i18n-aria="input.ec"><span aria-hidden="true">EV</span></span><output class="sr-only" id="ec-val" aria-hidden="true"></output></div><input type="range" id="ec" min="-3" max="3" step="0.001" aria-label="Exposure compensation" data-i18n-aria="field.ec"></div>
-      <div class="field"><span class="field-label" data-i18n="field.nd">ND filter</span>
-        <div class="seg lines" role="group" aria-label="ND filter" data-i18n-aria="aria.nd">
-          <button type="button" data-nd="0" id="nd-0" data-i18n="nd.0">None</button>
-          <button type="button" data-nd="3" id="nd-3" data-i18n="nd.3">ND8&#10;3 stops</button>
-          <button type="button" data-nd="6" id="nd-6" data-i18n="nd.6">ND64&#10;6 stops</button>
-          <button type="button" data-nd="10" id="nd-10" data-i18n="nd.10">ND1000&#10;10 stops</button>
-        </div>
-      </div>
-      <div class="seg" role="group" aria-label="Support" data-i18n-aria="aria.support">
-        <button type="button" data-support="tripod" id="sup-tripod" data-i18n="support.tripod">Tripod</button>
-        <button type="button" data-support="stabilized" id="sup-is" data-i18n="support.stabilized">Handheld + IS</button>
-        <button type="button" data-support="handheld" id="sup-hand" data-i18n="support.handheld">Handheld</button>
-      </div>
-    </section>
-
-    <section class="group" data-panel="focus">
-      <h2 data-i18n="group.focus">Focus</h2>
-      <div class="focus-line"><span class="note" data-i18n="focus.note">Click anywhere in the picture to focus there.</span><button type="button" class="btn btn-weak" id="refocus" data-i18n="focus.refocus">Focus on subject</button></div>
+      </div></details>
     </section>
 
     <section class="group" data-panel="picture">
       <h2 data-i18n="group.picture">Picture</h2>
-      <div class="row2">
-        <label class="field"><span class="field-label" data-i18n="field.wb">White balance</span><select id="wb"></select></label>
-        <label class="field"><span class="field-label" data-i18n="field.style">Style</span><select id="style"></select></label>
-      </div>
-      <label class="check"><input type="checkbox" id="zebra"> <span data-i18n="field.zebra">Show clipped highlights</span></label>
-      <div class="row2">
-        <button type="button" class="btn btn-weak" id="share" data-i18n="share.copy">Copy link</button>
-        <button type="button" class="btn" id="reset" data-i18n="reset.label">Reset settings</button>
-      </div>
+      <details class="quick-starts" id="quick-starts">
+        <summary data-i18n="group.start">Quick starts</summary>
+        <div class="chips" id="presets"></div>
+        <p class="note" id="preset-look" data-i18n="start.note">One click sets up a comparison and tells you what to look at.</p>
+      </details>
     </section>
 
     <section class="group" data-panel="compare">
