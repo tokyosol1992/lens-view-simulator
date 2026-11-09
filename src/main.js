@@ -136,6 +136,7 @@ const fmtEV = (e) => {
   return (e >= 0 ? '+' : '−') + value;
 };
 const fmtInput = (n) => String(+Number(n).toFixed(3));
+const fmtMetres = (n) => Number(n).toFixed(2);
 
 // --- Populate controls (re-run when the language changes) ---------------------------------
 function fillSelect(el, items, value, groups, label = loc) {
@@ -148,22 +149,13 @@ function fillSelect(el, items, value, groups, label = loc) {
     : items.map(opt).join('');
   el.value = value;
 }
-// --- Lens browser: brand, view (full-frame equivalent) and sensor-fit filters ----------------
-const VIEWS = [
-  { id: 'all', min: 0, max: Infinity },
-  { id: 'uw', min: 0, max: 23.99 },
-  { id: 'wide', min: 24, max: 39.99 },
-  { id: 'std', min: 40, max: 69.99 },
-  { id: 'portrait', min: 70, max: 135.99 },
-  { id: 'tele', min: 136, max: Infinity },
-];
-const ui = { brand: 'all', view: 'all', fits: false };
+// --- Lens browser: brand and sensor-fit filters ----------------
+const ui = { brand: 'all', fits: false };
 // Equivalent field of view depends on the selected camera, not the lens's native format.
 const eqRange = (l) => { const c = O.cropFactor(camera()); return [l.focal[0] * c, l.focal[1] * c]; };
 function lensMatches(l) {
-  const v = VIEWS.find((x) => x.id === ui.view), [a, b] = eqRange(l);
   return (!l.legacy || l.id === state.lensId) && (ui.brand === 'all' || l.brand === ui.brand)
-    && (!ui.fits || O.lensCovers(l, camera())) && b >= v.min && a <= v.max;
+    && (!ui.fits || O.lensCovers(l, camera()));
 }
 // Lens names carry their full-frame equivalent and a marker when the lens does not cover the sensor.
 function lensLabel(l) {
@@ -201,7 +193,6 @@ function fillBrandControls() {
   const total = LENSES.filter((l) => !l.legacy).length;
   $('brand').innerHTML = `<option value="all">${t('brand.all')} (${total})</option>` + BRANDS.map((b) => `<option value="${b.id}">${loc(b)} (${count(b.id)})</option>`).join('');
   $('brand').value = ui.brand;
-  $('views').innerHTML = VIEWS.map((v) => `<button type="button" class="chip" data-view="${v.id}" aria-pressed="${ui.view === v.id}">${t('view.' + v.id)}</button>`).join('');
   $('fits').checked = ui.fits;
 }
 
@@ -226,8 +217,6 @@ function renderLabels() {
   fillLenses();
   fillFrameControls();
   $('presets').innerHTML = PRESETS.map((p) => `<button type="button" class="chip" data-preset="${p.id}" id="preset-${p.id}">${loc(p)}</button>`).join('');
-  fillSelect($('wb'), WHITE_BALANCE, state.wb);
-  fillSelect($('style'), STYLES, state.style);
   fillSelect($('scene-select'), SCENE_LIST, state.sceneId);
   syncCompareUI();
 }
@@ -490,8 +479,8 @@ function renderUI(cam, ln, sc, r) {
   $('camera').value = cam.id;
   if ($('lens').dataset.cam !== cam.id + getLang()) { fillLenses(); $('lens').dataset.cam = cam.id + getLang(); }
   const matching = LENSES.filter(lensMatches);
-  if (matching.length && !matching.some((l) => l.id === ln.id) && (ui.brand !== 'all' || ui.view !== 'all' || ui.fits)) {
-    Object.assign(ui, { brand: 'all', view: 'all', fits: false }); fillBrandControls(); fillLenses();
+  if (matching.length && !matching.some((l) => l.id === ln.id) && (ui.brand !== 'all' || ui.fits)) {
+    Object.assign(ui, { brand: 'all', fits: false }); fillBrandControls(); fillLenses();
   }
   $('lens').value = ln.id;
   $('scene-select').value = sc.id;
@@ -499,20 +488,6 @@ function renderUI(cam, ln, sc, r) {
   document.querySelectorAll('[data-support]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.support === state.support)));
   document.querySelectorAll('[data-nd]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.nd === state.nd)));
   document.querySelectorAll('[data-zoom]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.zoom === state.loupeZoom)));
-  $('lens-note').textContent = loc(ln, 'note') + (ln.legacy ? ' ' + t('lens.estimated') : '');
-  {
-    const covers = O.lensCovers(ln, cam);
-    const m = fmtDist(ln.minFocus);
-    const spec = ln.focal[0] === ln.focal[1]
-      ? t('lens.specFixed', { f: ln.focal[0], n: fmtN(ln.maxN[0]), m })
-      : t('lens.specZoom', { f1: ln.focal[0], f2: ln.focal[1], n1: fmtN(ln.maxN[0]), n2: fmtN(ln.maxN[1]), m });
-    const el = $('lens-spec');
-    const fmtName = loc(FORMATS[ln.format], 'label');
-    const meta = ln.brand === 'generic' ? t('lens.metaGeneric', { fmt: fmtName }) : t('lens.meta', { brand: loc(BRANDS.find((x) => x.id === ln.brand)), mount: ln.mount, fmt: fmtName });
-    el.textContent = `${meta} · ${spec} · ${t('lens.blades', { b: ln.blades })} · ${t(covers ? 'lens.covers' : 'lens.vignettes')}`;
-    $('lens-est').textContent = ln.legacy ? '' : t(ln.est ? 'lens.est' : 'lens.noteClass');
-    el.classList.toggle('bad', !covers);
-  }
   document.querySelectorAll('[data-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === activePreset)));
   $('scene-note').textContent = loc(sc, 'blurb');
   $('cam-spec').textContent = t('cam.spec', {
@@ -549,15 +524,14 @@ function renderUI(cam, ln, sc, r) {
   // Distance & focus
   $('distance').min = sc.camera.min; $('distance').max = sc.camera.max; $('distance').value = state.distance;
   $('distance-val').textContent = fmtDist(state.distance);
-  syncInput('distance-input', fmtInput(state.distance), sc.camera.min, sc.camera.max);
+  syncInput('distance-input', fmtMetres(state.distance), sc.camera.min, sc.camera.max);
   $('keep').checked = state.keepFraming;
   $('focus-val').textContent = fmtDist(r.focusM);
-  syncInput('focus-input', fmtInput(r.focusM), ln.minFocus, 10000);
+  syncInput('focus-input', fmtMetres(r.focusM), ln.minFocus, 10000);
   $('focus-src').textContent = t(state.afTracksSubject ? 'focus.subject' : 'focus.manual');
   renderFrames();
 
   // Picture
-  $('wb').value = state.wb; $('style').value = state.style; $('zebra').checked = state.zebra;
   $('grid').checked = state.grid;
 
   // Viewfinder info line
@@ -784,8 +758,8 @@ function schedule() { if (!queued) { queued = true; requestAnimationFrame(() => 
 // are clamped and announced; an invalid entry restores the previous value.
 const directInputs = [
   { id: 'focal-input', read: () => state.focal, bounds: () => lens().focal, write: (v) => { state.focal = v; } },
-  { id: 'distance-input', read: () => state.distance, bounds: () => [scene().camera.min, scene().camera.max], write: (v) => { state.distance = v; lastFEq = null; state.afTracksSubject = true; } },
-  { id: 'focus-input', read: () => state.focusM, bounds: () => [lens().minFocus, 10000], write: (v) => { state.focusM = v; state.afTracksSubject = false; } },
+  { id: 'distance-input', precision: 2, format: fmtMetres, read: () => state.distance, bounds: () => [scene().camera.min, scene().camera.max], write: (v) => { state.distance = v; lastFEq = null; state.afTracksSubject = true; } },
+  { id: 'focus-input', precision: 2, format: fmtMetres, read: () => state.focusM, bounds: () => [lens().minFocus, 10000], write: (v) => { state.focusM = v; state.afTracksSubject = false; } },
   { id: 'aperture-input', read: () => state.N, bounds: () => [O.maxApertureAt(lens(), state.focal), lens().minN], write: (v) => { state.N = v; } },
   { id: 'shutter-input', read: () => state.shutter, bounds: () => [1 / 8000, 30], parse: parseShutter, format: shutterParam, write: (v) => { state.shutter = v; } },
   { id: 'iso-input', read: () => state.iso, bounds: () => [isoList(camera())[0], camera().maxISO], write: (v) => { state.iso = Math.round(v); } },
@@ -819,7 +793,7 @@ for (const spec of directInputs) {
     }
     const [min, max] = spec.bounds();
     const bounded = clamp(parsed, min, max);
-    const value = spec.parse ? bounded : +bounded.toFixed(3);
+    const value = spec.parse ? bounded : +bounded.toFixed(spec.precision ?? 3);
     spec.write(value);
     input.value = format(spec.read());
     entry.classList.remove('entry-error');
@@ -865,13 +839,6 @@ function onFilter() {
 }
 $('brand').addEventListener('change', (e) => { ui.brand = e.target.value; onFilter(); });
 $('fits').addEventListener('change', (e) => { ui.fits = e.target.checked; onFilter(); });
-$('views').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-view]');
-  if (!b) return;
-  ui.view = b.dataset.view;
-  document.querySelectorAll('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === ui.view)));
-  onFilter();
-});
 $('focal').addEventListener('input', (e) => { state.focal = +e.target.value; schedule(); });
 $('scene-select').addEventListener('change', (e) => {
   const prevScene = scene();
@@ -894,34 +861,51 @@ $('aperture').addEventListener('input', (e) => { state.N = apertureList(lens())[
 $('shutter').addEventListener('input', (e) => { state.shutter = shutterList()[+e.target.value][1]; schedule(); });
 $('iso').addEventListener('input', (e) => { state.iso = isoList(camera())[+e.target.value]; schedule(); });
 $('ec').addEventListener('input', (e) => { state.ec = +e.target.value; schedule(); });
-$('distance').addEventListener('input', (e) => { state.distance = +e.target.value; lastFEq = null; state.afTracksSubject = true; schedule(); });
+let distanceAnchor = null;
+$('distance').addEventListener('pointerdown', () => { distanceAnchor = state.distance; });
+$('distance').addEventListener('pointerup', () => { distanceAnchor = null; });
+$('distance').addEventListener('pointercancel', () => { distanceAnchor = null; });
+$('distance').addEventListener('input', (e) => {
+  const anchor = distanceAnchor ?? state.distance;
+  state.distance = clamp(anchor + Math.round((+e.target.value - anchor) * 2) / 2, scene().camera.min, scene().camera.max);
+  lastFEq = null; state.afTracksSubject = true; schedule();
+});
+$('distance').addEventListener('keydown', (e) => {
+  const direction = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+  if (!direction) return;
+  e.preventDefault(); state.distance = clamp(state.distance + direction * 0.5, scene().camera.min, scene().camera.max);
+  lastFEq = null; state.afTracksSubject = true; schedule();
+});
 $('keep').addEventListener('change', (e) => { state.keepFraming = e.target.checked; schedule(); });
-$('refocus').addEventListener('click', () => { state.afTracksSubject = true; schedule(); });
 $('refocus-chip').addEventListener('click', () => { state.afTracksSubject = true; schedule(); });
-$('wb').addEventListener('change', (e) => { state.wb = e.target.value; schedule(); });
-$('style').addEventListener('change', (e) => { state.style = e.target.value; schedule(); });
-$('zebra').addEventListener('change', (e) => { state.zebra = e.target.checked; schedule(); });
+$('jump-focus').addEventListener('click', () => {
+  const target = $('focus-scale');
+  const dock = document.querySelector('.dock');
+  const pinned = getComputedStyle(dock).position === 'sticky';
+  const offset = pinned ? dock.getBoundingClientRect().height + (innerWidth > 980 ? 12 : 0) + 16 : 16;
+  window.scrollTo({ top: Math.max(0, window.scrollY + target.getBoundingClientRect().top - offset), behavior: 'instant' });
+  target.focus({ preventScroll: true });
+});
 $('grid').addEventListener('change', (e) => { state.grid = e.target.checked; schedule(); });
 
 // Focus scale: drag to focus
 (() => {
   const svg = $('focus-scale');
-  let dragging = false;
+  let dragging = false, anchorFocus = 0, anchorScale = 0;
   const set = (ev) => {
     const rect = svg.getBoundingClientRect();
     const t = clamp((ev.clientX - rect.left - FS_PAD) / (rect.width - FS_PAD * 2), 0, 1);
-    state.focusM = focusFromT(t, lens().minFocus);
+    state.focusM = clamp(anchorFocus + Math.round((focusFromT(t, lens().minFocus) - anchorScale) * 2) / 2, lens().minFocus, 10000);
     state.afTracksSubject = false;
     schedule();
   };
-  svg.addEventListener('pointerdown', (e) => { dragging = true; svg.setPointerCapture(e.pointerId); set(e); });
+  svg.addEventListener('pointerdown', (e) => { const rect = svg.getBoundingClientRect(); const t = clamp((e.clientX - rect.left - FS_PAD) / (rect.width - FS_PAD * 2), 0, 1); anchorFocus = state.focusM; anchorScale = focusFromT(t, lens().minFocus); dragging = true; svg.setPointerCapture(e.pointerId); });
   svg.addEventListener('pointermove', (e) => { if (dragging) set(e); });
   svg.addEventListener('pointerup', () => { dragging = false; });
   svg.addEventListener('keydown', (e) => {
-    const t = focusT(state.focusM, lens().minFocus);
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       e.preventDefault();
-      state.focusM = focusFromT(clamp(t + (e.key === 'ArrowRight' ? 0.01 : -0.01), 0, 1), lens().minFocus);
+      state.focusM = clamp(state.focusM + (e.key === 'ArrowRight' ? 0.5 : -0.5), lens().minFocus, 10000);
       state.afTracksSubject = false; schedule();
     }
   });

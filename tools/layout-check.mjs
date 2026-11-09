@@ -70,12 +70,12 @@ for (const lang of ['en', 'ko']) {
 
     if (wide) {
       const visible = await page.evaluate(() => [...document.querySelectorAll('[data-panel]')].every((p) => p.getBoundingClientRect().height > 0));
-      check(`${tag}: all panels show, no tab bar, no phone chip`, visible && !m.tabsShown && !m.chipShown);
+      check(`${tag}: all panels show, no tab bar, compare shortcut visible`, visible && !m.tabsShown && m.chipShown);
       check(`${tag}: settings sit to the right of the picture`, m.ctl.left >= m.stage.right - 1, `controls ${m.ctl.left.toFixed(0)} vs stage ${m.stage.right.toFixed(0)}`);
-      check(`${tag}: nothing is pinned`, !m.pinned);
+      check(`${tag}: picture is pinned`, m.pinned);
     } else {
       check(`${tag}: tab bar and phone chip show`, m.tabsShown && m.chipShown);
-      check(`${tag}: picture, focus scale and tabs are pinned`, m.pinned);
+      check(`${tag}: picture and tabs are pinned`, m.pinned);
       const tabsFit = await page.evaluate(() => { const vw = document.documentElement.clientWidth; return [...document.querySelectorAll('.tabs button')].map((b) => b.getBoundingClientRect().right).every((x) => x <= vw + 0.5); });
       if (width >= 360) check(`${tag}: all five tabs are visible without scrolling the tab bar`, tabsFit);
       for (const tab of TABS) {
