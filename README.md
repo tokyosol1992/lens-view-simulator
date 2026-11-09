@@ -4,7 +4,7 @@ A web page for camera and lens customers. Pick a camera body, a lens and a sampl
 
 The interface is available in English and Korean. The **EN / 한국어** switch sits in the top bar on phones and desktops. It defaults to the browser language, remembers the choice in the browser, and can be set with `?lang=ko` or `?lang=en`. Switching language changes only the text, so the picture is not re-rendered.
 
-On wide screens the picture is on the left, exposure controls and the focus scale are below it, and camera and distance settings are on the right. On phones and narrow windows the picture and tab bar scroll with the page, and the tabs (**Camera, Distance, Exposure, Picture, Results**) choose which panel scrolls beneath them. The focus scale and exposure meter sit below the exposure controls. The location selector sits on the picture; a **Hold as A** chip starts a comparison without leaving the settings.
+On wide screens the picture is on the left, exposure controls and the focus scale are below it, and camera and distance settings are on the right. On phones and narrow windows the picture and tab bar scroll with the page, and the tabs (**Camera, Distance, Exposure, Picture, Results**) choose which panel scrolls beneath them. The exposure panel shows aperture and shutter, then ISO and exposure compensation, in two columns. The focus scale and exposure meter sit below the exposure controls. The location selector sits on the picture; a **Hold as A** chip starts a comparison without leaving the settings.
 
 The exposure panel puts ND filters and camera support under **More exposure settings**, and **Go to focus** scrolls to the focus scale. With **Keep subject size** enabled, changing focal length also changes camera-to-subject distance.
 
